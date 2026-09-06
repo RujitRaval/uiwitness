@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import {
   REPORT_SCHEMA_VERSION,
+  PRIVACY_REPORT_SCHEMA_VERSION,
   ReportValidationError,
   ResultValidationError,
   expandMatrix,
   parseConfig,
   parseExecutionResult,
+  parseAnyReport,
   parseReport,
   screenshotArtifactPath,
   serializeReport,
   type ExecutionResult,
   type UIWitnessReport,
+  type UIWitnessReportV2,
 } from "../src/index.js";
 
 const cells = expandMatrix(
@@ -101,6 +104,28 @@ function validReport(): UIWitnessReport {
   };
 }
 
+function validPrivacyReport(
+  retention: "failures-only" | "none" = "failures-only",
+): UIWitnessReportV2 {
+  const source = validReport();
+  return {
+    evidence: { retention },
+    executions: source.executions.map((execution) => {
+      const { screenshotPath, ...rest } = execution;
+      return {
+        ...rest,
+        screenshot: retention === "none" || execution.status === "passed"
+          ? { status: "omitted-by-policy" as const }
+          : { path: screenshotPath!, status: "captured" as const },
+      };
+    }),
+    generatedAt: source.generatedAt,
+    project: source.project,
+    schemaVersion: PRIVACY_REPORT_SCHEMA_VERSION,
+    summary: source.summary,
+  };
+}
+
 function withCredentials(
   value: string,
   username = "user",
@@ -125,6 +150,16 @@ function captureResultError(input: unknown): ResultValidationError {
 function captureReportError(input: unknown): ReportValidationError {
   try {
     parseReport(input);
+  } catch (error: unknown) {
+    expect(error).toBeInstanceOf(ReportValidationError);
+    return error as ReportValidationError;
+  }
+  throw new Error("Expected report validation to fail.");
+}
+
+function captureAnyReportError(input: unknown): ReportValidationError {
+  try {
+    parseAnyReport(input);
   } catch (error: unknown) {
     expect(error).toBeInstanceOf(ReportValidationError);
     return error as ReportValidationError;
@@ -346,7 +381,7 @@ describe("parseReport", () => {
   it("rejects unsupported schema versions at a stable path", () => {
     const error = captureReportError({
       ...validReport(),
-      schemaVersion: 2,
+      schemaVersion: 3,
     });
 
     expect(error.code).toBe("REPORT_INVALID");
@@ -575,6 +610,42 @@ describe("parseReport", () => {
 
     expect(Object.isFrozen(error.issues)).toBe(true);
     expect(Object.isFrozen(error.issues[0])).toBe(true);
+  });
+});
+
+describe("parseAnyReport privacy invariants", () => {
+  it("accepts consistent none and failures-only reports while the legacy reader rejects v2", () => {
+    expect(parseAnyReport(validPrivacyReport("none"))).toEqual(
+      validPrivacyReport("none"),
+    );
+    expect(parseAnyReport(validPrivacyReport("failures-only"))).toEqual(
+      validPrivacyReport("failures-only"),
+    );
+    expect(() => parseReport(validPrivacyReport())).toThrow(ReportValidationError);
+  });
+
+  it.each([
+    ["none with captured bytes", "none", 0, { path: ".uiwitness/artifacts/dashboard/success/desktop-light.png", status: "captured" }],
+    ["passing failures-only capture", "failures-only", 0, { path: ".uiwitness/artifacts/dashboard/success/desktop-light.png", status: "captured" }],
+    ["failed failures-only omission", "failures-only", 1, { status: "omitted-by-policy" }],
+    ["passed capture failure", "failures-only", 0, { status: "capture-failed" }],
+    ["wrong captured path", "failures-only", 1, { path: ".uiwitness/artifacts/dashboard/success/desktop-light.png", status: "captured" }],
+    ["missing captured path", "failures-only", 1, { status: "captured" }],
+  ] as const)("rejects %s", (_label, retention, index, screenshot) => {
+    const report = structuredClone(validPrivacyReport(retention));
+    const executions = [...report.executions];
+    executions[index] = {
+      ...report.executions[index]!,
+      screenshot,
+    } as never;
+
+    expect(captureAnyReportError({ ...report, executions }).issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.stringContaining(`$.executions[${index}].screenshot`),
+        }),
+      ]),
+    );
   });
 });
 

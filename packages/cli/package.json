@@ -1,6 +1,6 @@
 {
   "name": "uiwitness",
-  "version": "0.26.8",
+  "version": "0.26.9",
   "description": "Zero-config public-site checks and configured UI state coverage for UIWitness.",
   "license": "MIT",
   "repository": {

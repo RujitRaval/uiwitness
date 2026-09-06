@@ -8,7 +8,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { parseReport } from "uiwitness-core";
+import { parseAnyReport, parseReport } from "uiwitness-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const runPersistedScenarioCellsMock = vi.hoisted(() => vi.fn());
@@ -217,6 +217,7 @@ describe("scanProject options", () => {
       configPath,
       `export default {
   baseURL: "https://uiwitness.invalid",
+  evidence: { retention: "none", masks: [{ id: "private", selector: "[data-private]", routeIds: ["home"], stateIds: ["success"] }] },
   failOn: { consoleError: true, failedRequest: true, pageError: true },
   routes: [{ id: "home", path: "/", states: [{ id: "success", setup: "./scenario.mjs" }] }],
   themes: ["light"],
@@ -224,11 +225,12 @@ describe("scanProject options", () => {
 };\n`,
       "utf8",
     );
-    const report = parseReport({
+    const report = parseAnyReport({
+      evidence: { retention: "none" },
       executions: [],
       generatedAt: "2026-08-20T18:00:00.000Z",
       project: { baseURL: "https://uiwitness.invalid" },
-      schemaVersion: 1,
+      schemaVersion: 2,
       summary: {
         coverage: {
           execution: { covered: 0, percentage: 0, total: 0 },
@@ -250,11 +252,22 @@ describe("scanProject options", () => {
       reportPath: ".uiwitness/report/uiwitness.json",
     });
 
-    await scanProject({ configPath, cwd: project, headed: true });
+    const scan = await scanProject({ configPath, cwd: project, headed: true });
 
     expect(runPersistedScenarioCellsMock).toHaveBeenCalledOnce();
+    expect(scan.report.schemaVersion).toBe(2);
     expect(runPersistedScenarioCellsMock.mock.calls[0]![1]).toEqual({
       baseURL: "https://uiwitness.invalid",
+      evidence: {
+        masks: [{
+          id: "private",
+          required: true,
+          routeIds: ["home"],
+          selector: "[data-private]",
+          stateIds: ["success"],
+        }],
+        retention: "none",
+      },
       failOn: {
         consoleError: true,
         pageError: true,

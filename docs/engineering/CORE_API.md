@@ -35,6 +35,8 @@ export default defineConfig({
 
 The optional `authentication` object accepts one non-empty setup-module path, only `mode: "shared-readonly"` (the default), exact additional HTTP(S) origins, and explicit cookie scopes. Origins are normalized to scheme, punycoded host, and effective port. Cookie domains must be lowercase ASCII hosts, match the application or an additional origin, and cannot be ICANN or private public suffixes; scope paths begin with `/`, secure policy is explicit, and optional partition keys are normalized exact origins. Arrays and normalized values cannot be empty or duplicated.
 
+The optional `evidence` object accepts `retention: "all" | "failures-only" | "none"` and named masks. Mask IDs use the existing identifier grammar, selectors are non-empty and capped at 1,024 characters, `required` defaults to `true`, `count` is an exact positive integer, and non-empty route/state scopes must reference exact configured IDs. Duplicate IDs and scopes fail at their precise config path. Omitting evidence defaults behavior to `all` with no masks.
+
 `validateAuthenticationStorageState(state, options)` is the browser-independent enforcement boundary used by the runner. It returns a detached frozen `AuthenticationStorageState` only when every local-storage origin and cookie domain/path/secure/partition attribute stays inside the parsed policy. It throws an opaque `AuthenticationStateError` with `AUTH_ORIGIN_NOT_ALLOWED` or `AUTH_COOKIE_NOT_ALLOWED`; neither error contains cookie names, values, origins, local-storage keys, or secret data.
 
 Route, state, theme, and viewport IDs use lowercase letters and numbers separated by single hyphens. Domain-specific IDs such as `payment-declined` are supported.
@@ -113,7 +115,7 @@ Known failures match only when the observed unique sorted stable failure-code se
 
 `contractConfigDigest(configuration)` returns the RFC 8785 SHA-256 digest of the canonical ordered coordinate-ID/config-fingerprint inventory. `CONTRACT_CONFIG_DIGEST_ALGORITHM` identifies that projection. `contractVerdictStatus(findings)` applies the same stable overall rule independently: any `run-error` produces `error`, only all-matched findings produce `passed`, and every other set produces `failed`. `CONTRACT_FINDING_KINDS` publishes the complete finding vocabulary.
 
-The CLI adapts project config and the same run's in-memory schema-v1 report into these inputs, persists a deterministic machine verdict, and exposes stable process semantics. The browser-independent comparison contract stays owned here.
+The CLI adapts project config and the same run's in-memory schema-v1 or schema-v2 report into these inputs, persists a deterministic machine verdict, and exposes stable process semantics. The browser-independent comparison contract stays owned here.
 
 ## Contract proposals and named acceptance
 
@@ -153,24 +155,28 @@ Filesystem containment, content-addressed filenames, current config/contract rev
 
 ## Generation manifests and committed markers
 
-`UIWitnessGenerationManifest` is the browser-independent schema-v1 inventory for one complete local publication. Each `GenerationArtifactDescriptor` records a canonical project-relative POSIX path, artifact role, SHA-256 digest, byte length, and whether later constrained mutation is allowed. A manifest requires exactly one immutable report JSON member and one immutable report HTML member, binds the report digest, and may bind a semantic run digest plus sorted source-generation digests.
+`UIWitnessGenerationManifest` remains the source-compatible browser-independent schema-v1 inventory. `UIWitnessGenerationManifestV2` adds the closed `evidence-manifest` role and requires exactly one immutable member at `.uiwitness/report/evidence-manifest.json`; `AnyUIWitnessGenerationManifest` covers both versions. Every version requires exactly one immutable report JSON member and one immutable report HTML member, binds the report digest, and may bind a semantic run digest plus sorted source-generation digests.
+
+`UIWitnessEvidenceManifest` is canonical schema v1 at `.uiwitness/report/evidence-manifest.json`. It records retention, screenshot attempt/retained/omitted totals, successful mask IDs with cardinalities, the report digest, an optional verdict digest, and the semantic run digest (or report digest for an unguarded scan) as its generation identity. `parseEvidenceManifest` and `serializeEvidenceManifest` reject noncanonical or inconsistent data. Selectors and matched content are never represented.
+
+`UIWitnessReport` remains the source-compatible schema-v1 type. `UIWitnessReportV1` is its explicit alias; `UIWitnessReportV2` models privacy-policy output, and `AnyUIWitnessReport` is the discriminated union for code that handles both versions.
 
 ```ts
 import {
   generationManifestDigest,
+  parseAnyGenerationManifest,
   parseCommittedGeneration,
-  parseGenerationManifest,
 } from "uiwitness-core";
 
 const marker = parseCommittedGeneration(markerSource);
-const manifest = parseGenerationManifest(manifestSource);
+const manifest = parseAnyGenerationManifest(manifestSource);
 
 if (generationManifestDigest(manifest) !== marker.manifestDigest) {
   throw new Error("Generation marker mismatch");
 }
 ```
 
-`serializeGenerationManifest` and `serializeCommittedGeneration` emit exact JCS bytes with one trailing newline. Their parsers accept only canonical schema-v1 input, enforce unique lexicographically ordered paths/digests and the normative 1,024-character path maximum, and return recursively frozen values. `parseCommittedGeneration` additionally requires `.uiwitness/generations/<manifest-sha256>.manifest.json`, preventing a marker from redirecting validation to an unrelated path. Invalid input throws `GenerationValidationError` with code `GENERATION_INVALID`. `GENERATION_ARTIFACT_ROLES`, `GENERATION_MANIFEST_SCHEMA_VERSION`, and `COMMITTED_GENERATION_SCHEMA_VERSION` publish the stable protocol vocabulary. The runner owns filesystem staging, digesting actual bytes, cross-file proposal-family validation, fsync, commit ordering, and recovery.
+`parseGenerationManifest` and `serializeGenerationManifest` retain the schema-v1 source contract. `parsePrivacyGenerationManifest` and `serializePrivacyGenerationManifest` own schema v2, while `parseAnyGenerationManifest` is the dual-version reader used for committed generations. All variants require exact JCS bytes with one trailing newline, unique lexicographically ordered paths/digests, the normative 1,024-character path maximum, and recursively frozen values. `parseCommittedGeneration` additionally requires `.uiwitness/generations/<manifest-sha256>.manifest.json`, preventing a marker from redirecting validation to an unrelated path. Invalid input throws `GenerationValidationError` with code `GENERATION_INVALID`. The legacy and privacy schema/version/role constants publish each closed vocabulary without widening schema v1.
 
 ## Matrix planning
 
@@ -253,7 +259,7 @@ Plain strings are not assignable to `ScreenshotArtifactPath`. Code that reads a 
 
 `ExecutionResult` is the browser-independent persisted outcome for one matrix cell. It carries explicit route, state, viewport, theme, URL, scenario source, duration, status, screenshot, failure, and diagnostic data. Metadata is never reconstructed from a screenshot filename.
 
-`parseExecutionResult(input)` strictly validates an unknown record. Passed executions require a screenshot and cannot contain failures. Failed executions require at least one failure and may have a screenshot. Failure codes are a stable schema-v1 union covering navigation, page, console, request, assertion, screenshot, and internal failures.
+`parseExecutionResult(input)` strictly validates the internal schema-v1 writer record. Passed executions require a screenshot and cannot contain failures. Failed executions require at least one failure and may have a screenshot. Failure codes cover navigation, page, console, request, assertion, screenshot, mask selector/presence/cardinality/application, and internal failures.
 
 Diagnostics contain console-error strings, page-error strings, optional navigation status, and failed requests with only `url`, `method`, and sanitized `errorText`. Strict validation rejects headers, cookies, request or response bodies, and every other unknown property. Parsing removes URL credentials and fragments and replaces every query value with `[REDACTED]` while preserving query keys. This applies to the project base URL, route path, execution URL, and failed-request URLs. The runner remains responsible for sanitizing every free-form diagnostic string before constructing a result.
 
@@ -271,7 +277,9 @@ interface UIWitnessReport {
 }
 ```
 
-Use `REPORT_SCHEMA_VERSION` when constructing the report, `parseReport(input)` when reading unknown data, and `serializeReport(report)` when writing `.uiwitness/report/uiwitness.json`. The serializer validates before producing deterministic two-space-indented JSON with a trailing newline; it does not read the clock or filesystem.
+Use `REPORT_SCHEMA_VERSION` when constructing the default report and `parseReport(input)` for the source-compatible schema-v1 reader. Use `parseAnyReport(input)` at version-aware boundaries that accept privacy schema v2. `serializeReport(report)` validates either supported version before producing deterministic two-space-indented JSON with a trailing newline; it does not read the clock or filesystem.
+
+`REPORT_SCHEMA_VERSION` remains `1` for default `all` retention. `PRIVACY_REPORT_SCHEMA_VERSION` is `2`; it replaces `screenshotPath` with `screenshot: { status, path? }` and includes the non-default retention policy. The version-aware reader accepts both versions. Schema v2 requires all `none` screenshots to be `omitted-by-policy`; `failures-only` requires passing cells to be omitted and failed cells to be either captured or explicitly capture-failed.
 
 Report validation rejects unsupported versions, malformed RFC 3339 generation times, unknown properties, duplicate execution coordinates, conflicting route/state/viewport metadata, inconsistent counts or duration, and coverage that differs from `calculateCoverage` over the execution records. Empty execution selections remain representable with zero-valued summary and coverage metrics.
 
@@ -290,12 +298,13 @@ Report validation rejects unsupported versions, malformed RFC 3339 generation ti
 - `RouteDefinition`
 - `StateDefinition`
 - `FailurePolicy`
+- `EvidenceConfig`, `EvidenceMaskConfig`, `UIWitnessEvidenceManifest`, and `EvidenceManifestMask`
 - `MatrixCell` and `MatrixFilter`
 - `CoverageObservation`, `CoverageMetric`, and `CoverageSummary`
 - `ScreenshotArtifactPath`
 - `ExecutionResult`, `ExecutionStatus`, `ExecutionFailure`, `ExecutionFailureCode`, `ExecutionDiagnostics`, and `FailedRequestDiagnostic`
-- `UIWitnessReport` and `ReportSummary`
+- `UIWitnessReport`, `UIWitnessReportV1`, `UIWitnessReportV2`, `AnyUIWitnessReport`, report execution/screenshot variants, and `ReportSummary`
 - `UIWitnessErrorCode`
 - `CanonicalJsonIssue`, `ContractValidationIssue`, `ConfigValidationIssue`, `ResultValidationIssue`, `ReportValidationIssue`, `ContractValidationIssueCode`, and `ConfigValidationIssueCode`
 
-Exported functions are `defineConfig`, `parseConfig`, `parseContract`, `canonicalizeContract`, `contractDigest`, `canonicalizeJson`, `canonicalJsonDigest`, `compareContract`, `contractConfigDigest`, `contractVerdictStatus`, `createContractProposalSource`, `createContractProposal`, `applyContractProposal`, `emptyContractProposalMetadata`, `withContractProposalAnnotation`, `parseContractProposalSource`, `parseContractProposal`, `parseContractProposalMetadata`, `serializeContractProposalSource`, `serializeContractProposal`, `serializeContractProposalMetadata`, `contractProposalSourceDigest`, `contractProposalDigest`, `expandMatrix`, `calculateCoverage`, `screenshotArtifactPath`, `parseExecutionResult`, `parseReport`, and `serializeReport`. Exported constants are `CANONICAL_JSON_ALGORITHM`, `CONTRACT_CONFIG_DIGEST_ALGORITHM`, `CONTRACT_DIGEST_ALGORITHM`, `CONTRACT_FAILURE_CODES`, `CONTRACT_FINDING_KINDS`, `CONTRACT_FINDING_PRECEDENCE`, `CONTRACT_METADATA_SCHEMA_VERSION`, `CONTRACT_PROPOSAL_OPERATIONS`, `CONTRACT_PROPOSAL_SCHEMA_VERSION`, `CONTRACT_SCHEMA_VERSION`, `CONTRACT_SOURCE_SCHEMA_VERSION`, and `REPORT_SCHEMA_VERSION`.
+Exported functions additionally include `parseEvidenceManifest` and `serializeEvidenceManifest`. Exported constants additionally include `EVIDENCE_MANIFEST_PATH`, `EVIDENCE_MANIFEST_SCHEMA_VERSION`, and `PRIVACY_REPORT_SCHEMA_VERSION`; the existing browser-independent contract, proposal, generation, matrix, coverage, result, and report exports remain public.

@@ -18,8 +18,12 @@ import {
   ContractValidationError,
   GENERATION_ARTIFACT_ROLES,
   GENERATION_MANIFEST_SCHEMA_VERSION,
+  PRIVACY_GENERATION_MANIFEST_SCHEMA_VERSION,
+  EVIDENCE_MANIFEST_PATH,
+  EVIDENCE_MANIFEST_SCHEMA_VERSION,
   GenerationValidationError,
   REPORT_SCHEMA_VERSION,
+  PRIVACY_REPORT_SCHEMA_VERSION,
   ReportValidationError,
   ResultValidationError,
   UIWitnessError,
@@ -41,6 +45,7 @@ import {
   emptyContractProposalMetadata,
   expandMatrix,
   generationManifestDigest,
+  parseAnyGenerationManifest,
   parseCommittedGeneration,
   parseConfig,
   parseContract,
@@ -48,7 +53,10 @@ import {
   parseContractProposalMetadata,
   parseContractProposalSource,
   parseExecutionResult,
+  parseEvidenceManifest,
   parseGenerationManifest,
+  parsePrivacyGenerationManifest,
+  parseAnyReport,
   parseReport,
   screenshotArtifactPath,
   serializeCommittedGeneration,
@@ -56,6 +64,8 @@ import {
   serializeContractProposalMetadata,
   serializeContractProposalSource,
   serializeGenerationManifest,
+  serializePrivacyGenerationManifest,
+  serializeEvidenceManifest,
   serializeReport,
   validateAuthenticationStorageState,
   withContractProposalAnnotation,
@@ -87,6 +97,9 @@ import {
   type CoverageMetric,
   type CoverageObservation,
   type CoverageSummary,
+  type EvidenceConfig,
+  type EvidenceManifestMask,
+  type EvidenceMaskConfig,
   type FailurePolicy,
   type ExecutionDiagnostics,
   type ExecutionFailure,
@@ -102,6 +115,8 @@ import {
   type MatrixFilter,
   type RouteDefinition,
   type ReportExecutionResult,
+  type ReportExecutionResultV2,
+  type ReportScreenshot,
   type ReportScreenshotArtifactPath,
   type ReportSummary,
   type ReportValidationIssue,
@@ -114,7 +129,12 @@ import {
   type UIWitnessCommittedGeneration,
   type UIWitnessContract,
   type UIWitnessGenerationManifest,
+  type UIWitnessGenerationManifestV2,
+  type UIWitnessEvidenceManifest,
+  type AnyUIWitnessReport,
   type UIWitnessReport,
+  type UIWitnessReportV1,
+  type UIWitnessReportV2,
   type UIWitnessErrorCode,
   type ViewportDefinition,
 } from "uiwitness-core";
@@ -319,6 +339,24 @@ const generation: UIWitnessGenerationManifest = parseGenerationManifest(
   }),
 );
 const generationDigest = generationManifestDigest(generation);
+const privacyGeneration: UIWitnessGenerationManifestV2 =
+  parsePrivacyGenerationManifest(serializePrivacyGenerationManifest({
+    ...generation,
+    artifacts: [
+      {
+        bytes: 8,
+        digest: configDigest,
+        mutable: false,
+        path: EVIDENCE_MANIFEST_PATH,
+        role: "evidence-manifest",
+      },
+      ...generationArtifacts,
+    ],
+    schemaVersion: PRIVACY_GENERATION_MANIFEST_SCHEMA_VERSION,
+  }));
+const versionedGeneration = parseAnyGenerationManifest(
+  serializePrivacyGenerationManifest(privacyGeneration),
+);
 const committedGeneration: UIWitnessCommittedGeneration = parseCommittedGeneration(
   serializeCommittedGeneration({
     manifestDigest: generationDigest,
@@ -329,10 +367,30 @@ const committedGeneration: UIWitnessCommittedGeneration = parseCommittedGenerati
 );
 const generationError: UIWitnessError = new GenerationValidationError([]);
 const generationIssue: GenerationValidationIssue = contractIssue;
+void versionedGeneration;
+const manifestMask: EvidenceManifestMask = {
+  cardinalities: [1],
+  id: "account-email",
+};
+const evidenceManifest: UIWitnessEvidenceManifest = parseEvidenceManifest(
+  serializeEvidenceManifest({
+    attempted: 1,
+    captured: 1,
+    generationDigest,
+    masks: [manifestMask],
+    omitted: 0,
+    reportDigest: canonicalDigest,
+    retention: "all",
+    schemaVersion: EVIDENCE_MANIFEST_SCHEMA_VERSION,
+    verdictDigest: null,
+  }),
+);
 void generationRole;
 void committedGeneration;
 void generationError;
 void generationIssue;
+void EVIDENCE_MANIFEST_PATH;
+void evidenceManifest;
 
 const config = defineConfig({
   baseURL: "http://localhost:3000",
@@ -423,10 +481,49 @@ const report: UIWitnessReport = parseReport({
   schemaVersion: REPORT_SCHEMA_VERSION,
   summary: reportSummary,
 });
+declare const unknownReportInput: unknown;
+const sourceCompatibleReport: UIWitnessReport = parseReport(unknownReportInput);
 const serializedReport: string = serializeReport(report);
 const reportExecution: ReportExecutionResult = report.executions[0]!;
 const readableScreenshotPath: ReportScreenshotArtifactPath | null =
   reportExecution.screenshotPath;
+const parsedPrivacyReport = parseAnyReport({
+  evidence: { retention: "none" },
+  executions: [],
+  generatedAt: "2026-08-19T14:30:00.000Z",
+  project: { baseURL: config.baseURL },
+  schemaVersion: PRIVACY_REPORT_SCHEMA_VERSION,
+  summary: {
+    coverage: {
+      execution: { covered: 0, percentage: 0, total: 0 },
+      responsive: { covered: 0, percentage: 0, total: 0 },
+      state: { covered: 0, percentage: 0, total: 0 },
+      theme: { covered: 0, percentage: 0, total: 0 },
+    },
+    durationMs: 0,
+    executions: 0,
+    failed: 0,
+    passed: 0,
+    routes: 0,
+    states: 0,
+  },
+});
+if (parsedPrivacyReport.schemaVersion !== PRIVACY_REPORT_SCHEMA_VERSION) {
+  throw new Error("Expected a privacy report.");
+}
+const privacyReport: UIWitnessReportV2 = parsedPrivacyReport;
+const anyReport: AnyUIWitnessReport = privacyReport;
+const reportScreenshot: ReportScreenshot = { status: "omitted-by-policy" };
+void sourceCompatibleReport;
+declare const reportExecutionV2: ReportExecutionResultV2;
+const evidenceMask: EvidenceMaskConfig = {
+  id: "account-email",
+  selector: "[data-private=email]",
+};
+const evidenceConfig: EvidenceConfig = {
+  masks: [evidenceMask],
+  retention: "failures-only",
+};
 const resultValidationError: UIWitnessError = new ResultValidationError([]);
 const reportValidationError: UIWitnessError = new ReportValidationError([]);
 const resultIssue: ResultValidationIssue = {
@@ -449,6 +546,10 @@ void report;
 void serializedReport;
 void reportExecution;
 void readableScreenshotPath;
+void anyReport;
+void reportScreenshot;
+void reportExecutionV2;
+void evidenceConfig;
 void resultValidationError;
 void reportValidationError;
 void reportIssue;
@@ -476,7 +577,7 @@ export type PublicTypeContract = {
   viewport: ViewportDefinition;
 };
 
-const invalidReport: UIWitnessReport = {
+const invalidReport: UIWitnessReportV1 = {
   ...report,
   // @ts-expect-error Only report schema version 1 is supported.
   schemaVersion: 2,

@@ -14,6 +14,7 @@ import {
   serializeContractProposal,
   serializeContractProposalMetadata,
   serializeContractProposalSource,
+  type AnyUIWitnessReport,
   type ContractComparisonResult,
   type ContractConfigurationCoordinate,
   type JsonValue,
@@ -21,7 +22,6 @@ import {
   type ContractProposalSource,
   type GenerationArtifactRole,
   type Sha256Digest,
-  type UIWitnessReport,
 } from "uiwitness-core";
 
 import {
@@ -59,7 +59,7 @@ interface GuardGenerationSidecarArtifact {
   readonly mutable?: boolean | undefined;
   readonly path: string;
   readonly publication: "exclusive" | "immutable" | "replace";
-  readonly role: Exclude<GenerationArtifactRole, "evidence" | "report-html" | "report-json">;
+  readonly role: Exclude<GenerationArtifactRole, "evidence" | "evidence-manifest" | "report-html" | "report-json">;
 }
 
 export interface GuardGenerationFinalization {
@@ -92,7 +92,7 @@ export interface GuardResult {
   readonly machineVerdict: GuardMachineVerdict;
   readonly metadataPath?: string | undefined;
   readonly proposalPath?: string | undefined;
-  readonly report: UIWitnessReport;
+  readonly report: AnyUIWitnessReport;
   readonly verdictPath: typeof DEFAULT_GUARD_VERDICT_PATH;
 }
 
@@ -211,7 +211,7 @@ export async function prepareContractProposal(input: {
   readonly configuration: readonly ContractConfigurationCoordinate[];
   readonly contract: ReturnType<typeof parseContract> | null;
   readonly evaluatedOn: string;
-  readonly report: UIWitnessReport;
+  readonly report: AnyUIWitnessReport;
   readonly root: string;
   readonly runDigest: ReturnType<typeof guardRunDigest>;
 }): Promise<PreparedContractProposal> {

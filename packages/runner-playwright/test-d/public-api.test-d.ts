@@ -21,6 +21,7 @@ import {
   type AuthSetupContext,
   type AssertionScenarioContext,
   type CapturedScenarioCell,
+  type CompletedScenarioCell,
   type DiscoveredPublicRoute,
   type DiscoverPublicRoutesOptions,
   type PublicRouteDiscovery,
@@ -33,6 +34,7 @@ import {
   type GenerationArtifactPublication,
   type GenerationFinalization,
   type GenerationFinalizer,
+  type PrivacyGenerationFinalizer,
   type GenerationSidecarArtifact,
   type LoadScenarioOptions,
   type NavigatedScenarioCellExecutor,
@@ -43,6 +45,7 @@ import {
   type RunExecutionCellsOptions,
   type RunAuthenticationOptions,
   type RunCapturedScenarioCellsOptions,
+  type PrivacyRunCapturedScenarioCellsOptions,
   type RunNavigatedScenarioCellsOptions,
   type RunPersistedScenarioCellsOptions,
   type RunPublicSiteChecksOptions,
@@ -56,6 +59,7 @@ import {
   type UIWitnessScenario,
   type PublicRouteDiscoveryErrorCode,
 } from "uiwitness-runner-playwright";
+import type { UIWitnessReport } from "uiwitness-core";
 
 const authSetup: AuthSetup = async (context: AuthSetupContext) => {
   void context.context;
@@ -154,6 +158,20 @@ const captureOptions: RunCapturedScenarioCellsOptions = {
 const captureOutcomes: Promise<
   readonly CellExecutionOutcome<CapturedScenarioCell>[]
 > = runCapturedScenarioCells([execution.cell], captureOptions);
+const privacyCaptureOutcomes: Promise<
+  readonly CellExecutionOutcome<CompletedScenarioCell>[]
+> = runCapturedScenarioCells([execution.cell], {
+  ...captureOptions,
+  evidence: { retention: "none" },
+});
+const privacyCaptureOptions: PrivacyRunCapturedScenarioCellsOptions = {
+  ...captureOptions,
+  evidence: { retention: "none" },
+};
+const storedPrivacyCaptureOutcomes: Promise<
+  readonly CellExecutionOutcome<CompletedScenarioCell>[]
+> = runCapturedScenarioCells([execution.cell], privacyCaptureOptions);
+void storedPrivacyCaptureOutcomes;
 const generationPublication: GenerationArtifactPublication = "replace";
 const generationSidecar: GenerationSidecarArtifact = {
   contents: "{}\n",
@@ -161,8 +179,16 @@ const generationSidecar: GenerationSidecarArtifact = {
   publication: generationPublication,
   role: "contract-verdict",
 };
-const generationFinalizer: GenerationFinalizer = async (): Promise<GenerationFinalization> => ({
-  artifacts: [generationSidecar],
+const generationFinalizer: GenerationFinalizer = async (
+  _report: UIWitnessReport,
+): Promise<GenerationFinalization> => {
+  void _report;
+  return {
+    artifacts: [generationSidecar],
+    toolVersion: "1.0.0",
+  };
+};
+const privacyGenerationFinalizer: PrivacyGenerationFinalizer = async () => ({
   toolVersion: "1.0.0",
 });
 const persistenceOptions: RunPersistedScenarioCellsOptions = {
@@ -201,6 +227,8 @@ const generationManifestPath: Promise<string> = persistedRun.then(
   (run) => run.generation.manifestPath,
 );
 void lockedGenerationMutation;
+void privacyCaptureOutcomes;
+void privacyGenerationFinalizer;
 declare const capture: CapturedScenarioCell;
 const evidence: ScenarioCaptureEvidence = capture;
 const assertionStatus: AssertionStatus = capture.assertionStatus;

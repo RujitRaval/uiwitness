@@ -4,6 +4,25 @@ All notable changes to UIWitness will be documented in this file.
 
 This project uses the four-part version format required by the GStack ship workflow.
 
+## [0.26.9.0] - 2026-09-05
+
+### Added
+
+- Teams can now define named, route- and state-scoped screenshot masks with exact or optional match counts; UIWitness fails closed instead of retrying an unsafe unmasked capture.
+- Configured runs can retain screenshots for `all`, `failures-only`, or `none`, with explicit omission states in schema-v2 reports and a selector-free evidence manifest committed with every privacy-aware generation.
+- Offline reports now explain the active retention policy, captured and omitted evidence counts, applied mask IDs, and capture failures without exposing private selectors.
+
+### Changed
+
+- Privacy-aware generations use manifest schema v2 and report schema v2, while existing version-specific readers and the default `all` capture API remain source- and wire-compatible through explicit dual-version readers.
+- State Contract Guard fingerprints include normalized non-secret evidence policy so mask or retention changes produce deterministic contract drift.
+
+### Security
+
+- Mask capture binds the originally validated DOM nodes and the live selector set, then rejects additions, removals, substitutions, and transient or initially absent matches unless they were masked during the screenshot.
+- Report rendering verifies the evidence manifest against the canonical report digest, retention policy, and captured/omitted cardinalities before presenting privacy claims.
+- Report JSON, HTML, screenshots, evidence manifest, contract artifacts, and generation metadata publish through one crash-recoverable transaction with coherent rollback.
+
 ## [0.26.8.0] - 2026-09-05
 
 ### Added

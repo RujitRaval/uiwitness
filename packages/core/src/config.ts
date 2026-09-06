@@ -38,10 +38,27 @@ export interface FailurePolicy {
   readonly pageError?: boolean | undefined;
 }
 
+/** One named selector whose matched pixels must be obscured before capture. */
+export interface EvidenceMaskConfig {
+  readonly count?: number | undefined;
+  readonly id: string;
+  readonly required?: boolean | undefined;
+  readonly routeIds?: readonly string[] | undefined;
+  readonly selector: string;
+  readonly stateIds?: readonly string[] | undefined;
+}
+
+/** Screenshot masking and local byte-retention policy. */
+export interface EvidenceConfig {
+  readonly masks?: readonly EvidenceMaskConfig[] | undefined;
+  readonly retention?: "all" | "failures-only" | "none" | undefined;
+}
+
 /** The complete user-authored UIWitness configuration contract. */
 export interface UIWitnessConfig {
   readonly authentication?: AuthenticationConfig | undefined;
   readonly baseURL: string;
+  readonly evidence?: EvidenceConfig | undefined;
   readonly failOn?: FailurePolicy | undefined;
   readonly routes: readonly RouteDefinition[];
   readonly themes: readonly string[];
@@ -89,7 +106,7 @@ const stateSchema = z.strictObject({
 function addDuplicateIdIssues(
   values: readonly { readonly id: string }[],
   context: z.RefinementCtx,
-  label: "route" | "state",
+  label: "mask" | "route" | "state",
   pathPrefix: readonly PropertyKey[],
 ): void {
   const seen = new Set<string>();
@@ -123,6 +140,41 @@ const failurePolicySchema = z.strictObject({
   consoleError: z.boolean().optional(),
   failedRequest: z.boolean().optional(),
   pageError: z.boolean().optional(),
+});
+
+const scopedIdentifiersSchema = z.array(identifierSchema)
+  .min(1, "Mask scopes cannot be empty.")
+  .superRefine((values, context) => {
+    const seen = new Set<string>();
+    values.forEach((value, index) => {
+      if (seen.has(value)) {
+        context.addIssue({
+          code: "custom",
+          message: `Duplicate mask scope id "${value}".`,
+          params: { uiwitnessIssueCode: "duplicate" },
+          path: [index],
+        });
+      }
+      seen.add(value);
+    });
+  });
+
+const evidenceMaskSchema = z.strictObject({
+  count: z.number().int().positive().optional(),
+  id: identifierSchema,
+  required: z.boolean().default(true),
+  routeIds: scopedIdentifiersSchema.optional(),
+  selector: z.string().max(1_024).refine((value) => value.trim().length > 0, {
+    message: "Mask selectors cannot be empty.",
+  }),
+  stateIds: scopedIdentifiersSchema.optional(),
+});
+
+const evidenceSchema = z.strictObject({
+  masks: z.array(evidenceMaskSchema).default([]).superRefine((masks, context) => {
+    addDuplicateIdIssues(masks, context, "mask", []);
+  }),
+  retention: z.enum(["all", "failures-only", "none"]).default("all"),
 });
 
 const originSchema = z.string().max(1_024).transform((value, context) => {
@@ -212,6 +264,7 @@ const configSchema = z
       .refine(isHttpUrl, {
         message: "baseURL must use the http or https protocol.",
       }),
+    evidence: evidenceSchema.optional(),
     failOn: failurePolicySchema.optional(),
     routes: z.array(routeSchema).min(1, "Config must declare at least one route."),
     themes: z
@@ -239,6 +292,42 @@ const configSchema = z
   })
   .superRefine((config, context) => {
     addDuplicateIdIssues(config.routes, context, "route", ["routes"]);
+    const routeIds = new Set(config.routes.map(({ id }) => id));
+    const stateIds = new Set(
+      config.routes.flatMap(({ states }) => states.map(({ id }) => id)),
+    );
+    config.evidence?.masks.forEach((mask, maskIndex) => {
+      mask.routeIds?.forEach((id, index) => {
+        if (!routeIds.has(id)) {
+          context.addIssue({
+            code: "custom",
+            message: `Unknown mask route id "${id}".`,
+            path: ["evidence", "masks", maskIndex, "routeIds", index],
+          });
+        }
+      });
+      mask.stateIds?.forEach((id, index) => {
+        if (!stateIds.has(id)) {
+          context.addIssue({
+            code: "custom",
+            message: `Unknown mask state id "${id}".`,
+            path: ["evidence", "masks", maskIndex, "stateIds", index],
+          });
+        } else if (
+          mask.routeIds !== undefined &&
+          !config.routes.some((route) =>
+            mask.routeIds?.includes(route.id) === true &&
+            route.states.some((state) => state.id === id)
+          )
+        ) {
+          context.addIssue({
+            code: "custom",
+            message: `Mask state id "${id}" does not exist in its scoped routes.`,
+            path: ["evidence", "masks", maskIndex, "stateIds", index],
+          });
+        }
+      });
+    });
     if (config.authentication === undefined) return;
     const baseURL = new URL(config.baseURL);
     if (baseURL.username.length > 0 || baseURL.password.length > 0) {

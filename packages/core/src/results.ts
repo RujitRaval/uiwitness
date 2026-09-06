@@ -18,6 +18,8 @@ import type { MatrixCell } from "./matrix.js";
 
 /** The current external JSON report contract version. */
 export const REPORT_SCHEMA_VERSION = 1 as const;
+/** Report version used when screenshot retention intentionally omits bytes. */
+export const PRIVACY_REPORT_SCHEMA_VERSION = 2 as const;
 
 /** @internal Stable failure codes reused by validated execution projections. */
 export const EXECUTION_FAILURE_CODES = [
@@ -25,6 +27,10 @@ export const EXECUTION_FAILURE_CODES = [
   "CONSOLE_ERROR",
   "FAILED_REQUEST",
   "INTERNAL_ERROR",
+  "MASK_APPLY_FAILED",
+  "MASK_CARDINALITY_MISMATCH",
+  "MASK_REQUIRED_MISSING",
+  "MASK_SELECTOR_INVALID",
   "NAVIGATION_FAILED",
   "PAGE_ERROR",
   "SCREENSHOT_FAILED",
@@ -85,6 +91,24 @@ export interface ReportExecutionResult
   readonly screenshotPath: ReportScreenshotArtifactPath | null;
 }
 
+/** Explicit screenshot outcome used by privacy-aware schema-v2 reports. */
+export type ReportScreenshot =
+  | { readonly path: ReportScreenshotArtifactPath; readonly status: "captured" }
+  | { readonly status: "capture-failed" }
+  | { readonly status: "omitted-by-policy" };
+
+/** One schema-v2 execution with intentional omission separated from failure. */
+export interface ReportExecutionResultV2
+  extends Omit<ExecutionResult, "screenshotPath"> {
+  readonly screenshot: ReportScreenshot;
+  readonly screenshotPath?: never;
+}
+
+/** One execution from either supported external report version. */
+export type AnyReportExecutionResult =
+  | ReportExecutionResult
+  | ReportExecutionResultV2;
+
 /** Aggregate metrics stored in a report and checked against its executions. */
 export interface ReportSummary {
   readonly coverage: CoverageSummary;
@@ -96,7 +120,7 @@ export interface ReportSummary {
   readonly states: number;
 }
 
-/** Version 1 of UIWitness's external JSON report. */
+/** Version 1 of UIWitness's external JSON report. Retained for source compatibility. */
 export interface UIWitnessReport {
   readonly schemaVersion: typeof REPORT_SCHEMA_VERSION;
   readonly generatedAt: string;
@@ -105,7 +129,28 @@ export interface UIWitnessReport {
   };
   readonly summary: ReportSummary;
   readonly executions: readonly ReportExecutionResult[];
+  readonly evidence?: never;
 }
+
+/** Explicit name for the source-compatible schema-v1 report. */
+export type UIWitnessReportV1 = UIWitnessReport;
+
+/** Version 2 makes privacy-driven screenshot omission explicit. */
+export interface UIWitnessReportV2 {
+  readonly schemaVersion: typeof PRIVACY_REPORT_SCHEMA_VERSION;
+  readonly evidence: {
+    readonly retention: "failures-only" | "none";
+  };
+  readonly generatedAt: string;
+  readonly project: {
+    readonly baseURL: string;
+  };
+  readonly summary: ReportSummary;
+  readonly executions: readonly ReportExecutionResultV2[];
+}
+
+/** Every report version accepted by the current reader. */
+export type AnyUIWitnessReport = UIWitnessReportV1 | UIWitnessReportV2;
 
 const identifierPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const identifierMessage =
@@ -239,6 +284,17 @@ const executionResultShape = {
     viewportId: identifierSchema,
   } as const;
 
+const {
+  screenshotPath: _screenshotPathSchema,
+  ...executionResultV2Shape
+} = executionResultShape;
+void _screenshotPathSchema;
+const reportScreenshotSchema = z.discriminatedUnion("status", [
+  z.strictObject({ path: z.string(), status: z.literal("captured") }),
+  z.strictObject({ status: z.literal("capture-failed") }),
+  z.strictObject({ status: z.literal("omitted-by-policy") }),
+]);
+
 function validateExecutionResult(
   result: z.infer<ReturnType<typeof executionResultObjectSchema>>,
   context: z.RefinementCtx,
@@ -266,10 +322,7 @@ function validateExecutionResult(
       });
     }
     const expectedPath = screenshotArtifactPath(matrixCellFor(result));
-    const legacyPath = expectedPath.replace(
-      /^\.uiwitness\//u,
-      ".statecraft/",
-    );
+    const legacyPath = legacyScreenshotPath(expectedPath);
     if (
       result.screenshotPath !== null &&
       result.screenshotPath !== expectedPath &&
@@ -287,12 +340,53 @@ function executionResultObjectSchema() {
   return z.strictObject(executionResultShape);
 }
 
+function legacyScreenshotPath(expectedPath: string): string {
+  return expectedPath.replace(/^\.uiwitness\//u, ".statecraft/");
+}
+
 const executionResultSchema = executionResultObjectSchema().superRefine(
   (result, context) => validateExecutionResult(result, context, false),
 );
 const reportExecutionResultSchema = executionResultObjectSchema().superRefine(
   (result, context) => validateExecutionResult(result, context, true),
 );
+const reportExecutionResultV2Schema = z.strictObject({
+  ...executionResultV2Shape,
+  screenshot: reportScreenshotSchema,
+}).superRefine((result, context) => {
+  if (result.status === "passed" && result.failures.length > 0) {
+    context.addIssue({
+      code: "custom",
+      message: "Passed executions cannot contain failures.",
+      path: ["failures"],
+    });
+  }
+  if (result.status === "failed" && result.failures.length === 0) {
+    context.addIssue({
+      code: "custom",
+      message: "Failed executions must contain at least one failure.",
+      path: ["failures"],
+    });
+  }
+  if (result.status === "passed" && result.screenshot.status === "capture-failed") {
+    context.addIssue({
+      code: "custom",
+      message: "Passed executions cannot have a failed screenshot capture.",
+      path: ["screenshot", "status"],
+    });
+  }
+  if (result.screenshot.status === "captured") {
+    const expectedPath = screenshotArtifactPath(matrixCellFor(result));
+    const legacyPath = legacyScreenshotPath(expectedPath);
+    if (result.screenshot.path !== expectedPath && result.screenshot.path !== legacyPath) {
+      context.addIssue({
+        code: "custom",
+        message: "Screenshot path does not match the execution coordinate.",
+        path: ["screenshot", "path"],
+      });
+    }
+  }
+});
 
 const coverageMetricSchema = z
   .strictObject({
@@ -336,7 +430,9 @@ const reportSummarySchema = z.strictObject({
   states: z.number().int().nonnegative(),
 });
 
-function coordinateKey(result: ReportExecutionResult): string {
+type ReportValidationExecution = Omit<ExecutionResult, "screenshotPath">;
+
+function coordinateKey(result: ReportValidationExecution): string {
   return JSON.stringify([
     result.routeId,
     result.stateId,
@@ -345,7 +441,7 @@ function coordinateKey(result: ReportExecutionResult): string {
   ]);
 }
 
-function stateKey(result: ReportExecutionResult): string {
+function stateKey(result: ReportValidationExecution): string {
   return JSON.stringify([result.routeId, result.stateId]);
 }
 
@@ -357,16 +453,14 @@ function addSummaryIssue(
   context.addIssue({ code: "custom", message, path: [...path] });
 }
 
-const reportSchema = z
-  .strictObject({
-    schemaVersion: z.literal(REPORT_SCHEMA_VERSION),
-    generatedAt: z.string().datetime({ offset: true }),
-    project: z.strictObject({ baseURL: httpUrlSchema }),
-    summary: reportSummarySchema,
-    executions: z.array(reportExecutionResultSchema),
-  })
-  .superRefine((report, context) => {
-    const executions = report.executions as readonly ReportExecutionResult[];
+function validateReport(
+  report: {
+    readonly executions: readonly ReportValidationExecution[];
+    readonly summary: ReportSummary;
+  },
+  context: z.RefinementCtx,
+): void {
+    const executions = report.executions;
     const coordinates = new Set<string>();
     const routePaths = new Map<string, string>();
     const scenarioSources = new Map<string, string>();
@@ -479,7 +573,56 @@ const reportSchema = z
         );
       }
     }
+}
+
+const reportSchemaV1 = z.strictObject({
+  schemaVersion: z.literal(REPORT_SCHEMA_VERSION),
+  generatedAt: z.string().datetime({ offset: true }),
+  project: z.strictObject({ baseURL: httpUrlSchema }),
+  summary: reportSummarySchema,
+  executions: z.array(reportExecutionResultSchema),
+}).superRefine(validateReport);
+
+const reportSchemaV2 = z.strictObject({
+  schemaVersion: z.literal(PRIVACY_REPORT_SCHEMA_VERSION),
+  evidence: z.strictObject({
+    retention: z.enum(["failures-only", "none"]),
+  }),
+  generatedAt: z.string().datetime({ offset: true }),
+  project: z.strictObject({ baseURL: httpUrlSchema }),
+  summary: reportSummarySchema,
+  executions: z.array(reportExecutionResultV2Schema),
+}).superRefine((report, context) => {
+  validateReport(report, context);
+  report.executions.forEach((execution, index) => {
+    if (
+      report.evidence.retention === "none" &&
+      execution.screenshot.status !== "omitted-by-policy"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Retention 'none' requires every screenshot to be omitted by policy.",
+        path: ["executions", index, "screenshot", "status"],
+      });
+    }
+    if (
+      report.evidence.retention === "failures-only" &&
+      ((execution.status === "passed" && execution.screenshot.status !== "omitted-by-policy") ||
+        (execution.status === "failed" && execution.screenshot.status === "omitted-by-policy"))
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Failures-only retention must omit passing screenshots and retain failed capture outcomes.",
+        path: ["executions", index, "screenshot", "status"],
+      });
+    }
   });
+});
+
+const reportSchema = z.discriminatedUnion("schemaVersion", [
+  reportSchemaV1,
+  reportSchemaV2,
+]);
 
 function formatIssuePath(path: readonly PropertyKey[]): string {
   const propertyPattern = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -527,9 +670,9 @@ export function parseExecutionResult(input: unknown): ExecutionResult {
   return result.data as ExecutionResult;
 }
 
-/** Parses an unknown value into the supported versioned report contract. */
+/** Parses an unknown value into the source-compatible schema-v1 report contract. */
 export function parseReport(input: unknown): UIWitnessReport {
-  const result = reportSchema.safeParse(input);
+  const result = reportSchemaV1.safeParse(input);
   if (!result.success) {
     throw new ReportValidationError(
       result.error.issues.map(toIssue) as readonly ReportValidationIssue[],
@@ -538,7 +681,28 @@ export function parseReport(input: unknown): UIWitnessReport {
   return result.data as UIWitnessReport;
 }
 
+/** Parses an unknown value into either supported versioned report contract. */
+export function parseAnyReport(input: unknown): AnyUIWitnessReport {
+  const schemaVersion = typeof input === "object" && input !== null
+    ? (input as Record<string, unknown>)["schemaVersion"]
+    : undefined;
+  if (schemaVersion !== REPORT_SCHEMA_VERSION && schemaVersion !== PRIVACY_REPORT_SCHEMA_VERSION) {
+    throw new ReportValidationError([{
+      code: "invalid_value",
+      message: "Unsupported report schema version.",
+      path: "$.schemaVersion",
+    }]);
+  }
+  const result = reportSchema.safeParse(input);
+  if (!result.success) {
+    throw new ReportValidationError(
+      result.error.issues.map(toIssue) as readonly ReportValidationIssue[],
+    );
+  }
+  return result.data as AnyUIWitnessReport;
+}
+
 /** Serializes a validated report as deterministic, newline-terminated JSON. */
-export function serializeReport(report: UIWitnessReport): string {
-  return `${JSON.stringify(parseReport(report), null, 2)}\n`;
+export function serializeReport(report: AnyUIWitnessReport): string {
+  return `${JSON.stringify(parseAnyReport(report), null, 2)}\n`;
 }

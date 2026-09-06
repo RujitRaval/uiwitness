@@ -39,3 +39,7 @@ The report includes validated transformation plus a responsive offline document 
 ## State Contract Guard T6 delivery
 
 The renderer accepts an optional validated schema-v1 contract verdict without changing the schema-v1 execution report. The Playwright runner derives guard HTML from the exact canonical verdict sidecar inside the same crash-recoverable generation transaction, so report, evidence, verdict, proposal family, manifest, and committed marker cannot describe different runs. Contract status and findings lead; contract findings have their own coordinate and type filters, while the existing execution filters, matrix, inspection room, diagnostics, CSP, no-network boundary, and progressive no-script behavior remain intact.
+
+## State Contract Guard T10 delivery
+
+Privacy-policy reports distinguish a retained screenshot, policy-driven omission, and capture failure instead of rendering every absent image alike. A no-script privacy panel names the retention policy, attempted/captured/omitted totals, and successful mask IDs/cardinalities only after the selector-free evidence manifest binds to the exact report digest and counts. Default `all` output remains schema v1; `failures-only` and `none` use report schema v2 without changing the existing visual hierarchy, filters, offline boundary, or keyboard behavior.

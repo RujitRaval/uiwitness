@@ -9,6 +9,7 @@ import {
 import { GenerationValidationError } from "./errors.js";
 
 export const GENERATION_MANIFEST_SCHEMA_VERSION = 1 as const;
+export const PRIVACY_GENERATION_MANIFEST_SCHEMA_VERSION = 2 as const;
 export const COMMITTED_GENERATION_SCHEMA_VERSION = 1 as const;
 export const GENERATION_ARTIFACT_ROLES: readonly [
   "evidence",
@@ -30,7 +31,18 @@ export const GENERATION_ARTIFACT_ROLES: readonly [
   "json-copy",
 ] as const);
 
+export const PRIVACY_GENERATION_ARTIFACT_ROLES: readonly [
+  ...typeof GENERATION_ARTIFACT_ROLES,
+  "evidence-manifest",
+] = Object.freeze([
+  ...GENERATION_ARTIFACT_ROLES,
+  "evidence-manifest",
+] as const);
+
 export type GenerationArtifactRole = (typeof GENERATION_ARTIFACT_ROLES)[number];
+export type PrivacyGenerationArtifactRole =
+  (typeof PRIVACY_GENERATION_ARTIFACT_ROLES)[number];
+export type AnyGenerationArtifactRole = PrivacyGenerationArtifactRole;
 
 export interface GenerationArtifactDescriptor {
   readonly bytes: number;
@@ -38,6 +50,11 @@ export interface GenerationArtifactDescriptor {
   readonly mutable: boolean;
   readonly path: string;
   readonly role: GenerationArtifactRole;
+}
+
+export interface PrivacyGenerationArtifactDescriptor
+  extends Omit<GenerationArtifactDescriptor, "role"> {
+  readonly role: PrivacyGenerationArtifactRole;
 }
 
 export interface UIWitnessGenerationManifest {
@@ -49,6 +66,16 @@ export interface UIWitnessGenerationManifest {
   readonly sourceGenerationDigests: readonly Sha256Digest[];
   readonly toolVersion: string;
 }
+
+export interface UIWitnessGenerationManifestV2
+  extends Omit<UIWitnessGenerationManifest, "artifacts" | "schemaVersion"> {
+  readonly artifacts: readonly PrivacyGenerationArtifactDescriptor[];
+  readonly schemaVersion: typeof PRIVACY_GENERATION_MANIFEST_SCHEMA_VERSION;
+}
+
+export type AnyUIWitnessGenerationManifest =
+  | UIWitnessGenerationManifest
+  | UIWitnessGenerationManifestV2;
 
 export interface UIWitnessCommittedGeneration {
   readonly manifestDigest: Sha256Digest;
@@ -63,22 +90,41 @@ const safePathSchema = z.string().min(1).max(1_024).refine((value) => {
   const segments = value.split("/");
   return segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
 }, "Generation artifact paths must be safe project-relative POSIX paths.");
-const artifactSchema = z.strictObject({
+const artifactFields = {
   bytes: z.number().int().nonnegative(),
   digest: digestSchema,
   mutable: z.boolean(),
   path: safePathSchema,
+} as const;
+const artifactSchema = z.strictObject({
+  ...artifactFields,
   role: z.enum(GENERATION_ARTIFACT_ROLES),
 });
-const manifestSchema = z.strictObject({
-  artifacts: z.array(artifactSchema).min(2).max(20_050),
+const privacyArtifactSchema = z.strictObject({
+  ...artifactFields,
+  role: z.enum(PRIVACY_GENERATION_ARTIFACT_ROLES),
+});
+const commonManifestFields = {
   complete: z.literal(true),
   reportDigest: digestSchema,
   runDigest: digestSchema.nullable(),
-  schemaVersion: z.literal(GENERATION_MANIFEST_SCHEMA_VERSION),
   sourceGenerationDigests: z.array(digestSchema).max(1_000),
   toolVersion: z.string().min(1).max(128),
+} as const;
+const manifestSchemaV1 = z.strictObject({
+  artifacts: z.array(artifactSchema).min(2).max(20_050),
+  ...commonManifestFields,
+  schemaVersion: z.literal(GENERATION_MANIFEST_SCHEMA_VERSION),
 });
+const manifestSchemaV2 = z.strictObject({
+  artifacts: z.array(privacyArtifactSchema).min(3).max(20_051),
+  ...commonManifestFields,
+  schemaVersion: z.literal(PRIVACY_GENERATION_MANIFEST_SCHEMA_VERSION),
+});
+const anyManifestSchema = z.discriminatedUnion("schemaVersion", [
+  manifestSchemaV1,
+  manifestSchemaV2,
+]);
 const committedSchema = z.strictObject({
   manifestDigest: digestSchema,
   manifestPath: safePathSchema,
@@ -145,24 +191,24 @@ function orderedUnique(values: readonly string[]): boolean {
   return values.every((value, index) => index === 0 || values[index - 1]! < value);
 }
 
-export function parseGenerationManifest(source: string): UIWitnessGenerationManifest {
-  const result = manifestSchema.safeParse(parseCanonical(source));
-  if (!result.success) invalid(result.error.issues);
-  const paths = result.data.artifacts.map(({ path }) => path);
-  if (!orderedUnique(paths) || !orderedUnique(result.data.sourceGenerationDigests)) {
+function validateManifestInvariants(
+  manifest: AnyUIWitnessGenerationManifest,
+): AnyUIWitnessGenerationManifest {
+  const paths = manifest.artifacts.map(({ path }) => path);
+  if (!orderedUnique(paths) || !orderedUnique(manifest.sourceGenerationDigests)) {
     throw new GenerationValidationError([{
       code: "duplicate",
       message: "Generation artifacts and source digests must be unique and canonically ordered.",
       path: "$",
     }]);
   }
-  const report = result.data.artifacts.find(({ role }) => role === "report-json");
-  const html = result.data.artifacts.find(({ role }) => role === "report-html");
+  const report = manifest.artifacts.find(({ role }) => role === "report-json");
+  const html = manifest.artifacts.find(({ role }) => role === "report-html");
   if (
     report === undefined || html === undefined ||
-    result.data.artifacts.filter(({ role }) => role === "report-json").length !== 1 ||
-    result.data.artifacts.filter(({ role }) => role === "report-html").length !== 1 ||
-    report.digest !== result.data.reportDigest || report.mutable || html.mutable
+    manifest.artifacts.filter(({ role }) => role === "report-json").length !== 1 ||
+    manifest.artifacts.filter(({ role }) => role === "report-html").length !== 1 ||
+    report.digest !== manifest.reportDigest || report.mutable || html.mutable
   ) {
     throw new GenerationValidationError([{
       code: "invalid_value",
@@ -170,14 +216,66 @@ export function parseGenerationManifest(source: string): UIWitnessGenerationMani
       path: "$.artifacts",
     }]);
   }
-  return freeze(result.data as UIWitnessGenerationManifest);
+  if (manifest.schemaVersion === PRIVACY_GENERATION_MANIFEST_SCHEMA_VERSION) {
+    const evidenceManifests = manifest.artifacts.filter(
+      ({ role }) => role === "evidence-manifest",
+    );
+    if (
+      evidenceManifests.length !== 1 || evidenceManifests[0]!.mutable ||
+      evidenceManifests[0]!.path !== ".uiwitness/report/evidence-manifest.json"
+    ) {
+      throw new GenerationValidationError([{
+        code: "invalid_value",
+        message: "A privacy generation requires one immutable evidence manifest at its canonical path.",
+        path: "$.artifacts",
+      }]);
+    }
+  }
+  return freeze(manifest);
+}
+
+/** Parses the source-compatible schema-v1 generation manifest. */
+export function parseGenerationManifest(source: string): UIWitnessGenerationManifest {
+  const result = manifestSchemaV1.safeParse(parseCanonical(source));
+  if (!result.success) invalid(result.error.issues);
+  return validateManifestInvariants(
+    result.data as UIWitnessGenerationManifest,
+  ) as UIWitnessGenerationManifest;
+}
+
+/** Parses a schema-v2 generation with its required privacy manifest member. */
+export function parsePrivacyGenerationManifest(
+  source: string,
+): UIWitnessGenerationManifestV2 {
+  const result = manifestSchemaV2.safeParse(parseCanonical(source));
+  if (!result.success) invalid(result.error.issues);
+  return validateManifestInvariants(
+    result.data as UIWitnessGenerationManifestV2,
+  ) as UIWitnessGenerationManifestV2;
+}
+
+/** Parses either supported generation-manifest schema. */
+export function parseAnyGenerationManifest(
+  source: string,
+): AnyUIWitnessGenerationManifest {
+  const result = anyManifestSchema.safeParse(parseCanonical(source));
+  if (!result.success) invalid(result.error.issues);
+  return validateManifestInvariants(result.data as AnyUIWitnessGenerationManifest);
 }
 
 export function serializeGenerationManifest(manifest: UIWitnessGenerationManifest): string {
   return `${canonicalizeJson(manifest as unknown as JsonValue)}\n`;
 }
 
-export function generationManifestDigest(manifest: UIWitnessGenerationManifest): Sha256Digest {
+export function serializePrivacyGenerationManifest(
+  manifest: UIWitnessGenerationManifestV2,
+): string {
+  const source = `${canonicalizeJson(manifest as unknown as JsonValue)}\n`;
+  parsePrivacyGenerationManifest(source);
+  return source;
+}
+
+export function generationManifestDigest(manifest: AnyUIWitnessGenerationManifest): Sha256Digest {
   return canonicalJsonDigest(manifest as unknown as JsonValue);
 }
 

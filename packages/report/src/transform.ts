@@ -1,8 +1,8 @@
 import {
-  parseReport,
-  type ReportExecutionResult,
+  parseAnyReport,
+  type AnyReportExecutionResult,
+  type AnyUIWitnessReport,
   type ReportSummary,
-  type UIWitnessReport,
 } from "uiwitness-core";
 
 /** One viewport/theme column in the offline report matrix. */
@@ -17,8 +17,9 @@ export interface ReportColumnView {
 /** One validated execution prepared for report rendering. */
 export interface ReportCellView {
   readonly detailId: string;
-  readonly execution: ReportExecutionResult;
+  readonly execution: AnyReportExecutionResult;
   readonly screenshotHref: string | null;
+  readonly screenshotStatus: "capture-failed" | "captured" | "omitted-by-policy";
 }
 
 /** One route/state row aligned to every report column. */
@@ -37,14 +38,14 @@ export interface ReportRouteView {
   readonly rows: readonly ReportRowView[];
 }
 
-/** Deterministic, renderer-ready projection of a schema-v1 report. */
+/** Deterministic, renderer-ready projection of either supported report schema. */
 export interface ReportViewModel {
   readonly baseURL: string;
   readonly columns: readonly ReportColumnView[];
   readonly executions: readonly ReportCellView[];
   readonly generatedAt: string;
   readonly routes: readonly ReportRouteView[];
-  readonly schemaVersion: UIWitnessReport["schemaVersion"];
+  readonly schemaVersion: AnyUIWitnessReport["schemaVersion"];
   readonly summary: ReportSummary;
 }
 
@@ -63,8 +64,8 @@ interface RouteBuilder {
 }
 
 function freezeExecution(
-  execution: ReportExecutionResult,
-): ReportExecutionResult {
+  execution: AnyReportExecutionResult,
+): AnyReportExecutionResult {
   return Object.freeze({
     ...execution,
     diagnostics: Object.freeze({
@@ -104,24 +105,36 @@ function rowKey(routeId: string, stateId: string): string {
   return JSON.stringify([routeId, stateId]);
 }
 
-function screenshotHref(execution: ReportExecutionResult): string | null {
-  if (execution.screenshotPath === null) {
+function screenshotStatus(
+  execution: AnyReportExecutionResult,
+): "capture-failed" | "captured" | "omitted-by-policy" {
+  if ("screenshot" in execution) return execution.screenshot.status;
+  return execution.screenshotPath === null ? "capture-failed" : "captured";
+}
+
+function screenshotHref(execution: AnyReportExecutionResult): string | null {
+  const path = "screenshot" in execution
+    ? execution.screenshot.status === "captured"
+      ? execution.screenshot.path
+      : null
+    : execution.screenshotPath;
+  if (path === null) {
     return null;
   }
   const prefix = [".uiwitness/", ".statecraft/"].find((candidate) =>
-    execution.screenshotPath?.startsWith(candidate),
+    path.startsWith(candidate),
   );
   if (prefix === undefined) {
     throw new TypeError(
       "Screenshot paths must stay inside .uiwitness/ or .statecraft/.",
     );
   }
-  return `../${execution.screenshotPath.slice(prefix.length)}`;
+  return `../${path.slice(prefix.length)}`;
 }
 
 /** Validates and transforms report data without reading filenames for metadata. */
 export function transformReport(input: unknown): ReportViewModel {
-  const report = parseReport(input);
+  const report = parseAnyReport(input);
   const columns: ReportColumnView[] = [];
   const columnKeys = new Set<string>();
   const cells: ReportCellView[] = [];
@@ -149,6 +162,7 @@ export function transformReport(input: unknown): ReportViewModel {
       detailId: `execution-${index + 1}`,
       execution: frozenExecution,
       screenshotHref: screenshotHref(frozenExecution),
+      screenshotStatus: screenshotStatus(frozenExecution),
     });
     cells.push(cell);
 

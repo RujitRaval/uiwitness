@@ -121,6 +121,8 @@ export default defineConfig({
 
 Authentication is optional. Add `authentication: { setup: "./uiwitness/auth.mjs", mode: "shared-readonly" }` when the matrix needs one non-mutating account. Its trusted setup hook runs once, reads credentials directly from your environment or secret manager, and seeds every fresh cell context from validated in-memory state. UIWitness never writes a storage-state file; parent-domain, additional-origin, and partitioned cookies require explicit scopes. Fork pull requests must remain secret-free.
 
+Sensitive pixels can be protected with `evidence.masks`: each named selector may be scoped to exact routes/states, required, and given an exact cardinality. Mask failures block capture and never retry unmasked. Retention defaults to `all`; choose `failures-only` to keep only failed-cell images or `none` to disable both screenshots and runtime selector resolution. Privacy modes use explicit report schema v2 states, while default `all` runs retain schema-v1 compatibility. Every run writes a selector-free `evidence-manifest.json` beside the report.
+
 Scenarios are trusted local modules. They can intercept deterministic API responses, wait for product-specific readiness, and make assertions with the same Playwright page used for capture:
 
 ```js
@@ -156,6 +158,7 @@ Every completed scan writes a versioned report beneath `.uiwitness/`:
 ├── generation.json        # stable committed-generation marker
 ├── generations/           # content-addressed generation manifests
 └── report/
+    ├── evidence-manifest.json # retention, safe mask counts, and digests
     ├── index.html         # self-contained interactive report
     └── uiwitness.json
 ```
@@ -216,7 +219,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). The [Quick Check guide](docs/open
 
 ## Roadmap
 
-The current release is the local-first v0.1 product: explicit matrices, deterministic Playwright scenarios, offline evidence, CI usage, a complete example, the completed [public URL Quick Check](docs/designs/public-url-quick-check.md), and the first nine slices of the approved [State Contract Guard roadmap](docs/designs/uiwitness-state-contract-guard.md): strict contracts, deterministic comparison, fresh-run guard orchestration, exact-coordinate reproduction, machine verdicts, explicit proposal inspection/annotation/named acceptance, crash-recoverable atomic generation publication, contract-first offline reporting, the full-SHA-pinned GitHub Action adapter, complete exception governance, and memory-only shared-read-only authentication. Evidence privacy and sharding remain sequenced roadmap work. Hosted collaboration remains out of scope unless real demand appears.
+The current release is the local-first v0.1 product: explicit matrices, deterministic Playwright scenarios, offline evidence, CI usage, a complete example, the completed [public URL Quick Check](docs/designs/public-url-quick-check.md), and T1–T10 of the approved [State Contract Guard roadmap](docs/designs/uiwitness-state-contract-guard.md), through memory-only authentication and fail-closed evidence privacy. Deterministic sharding and its aggregation/release-proof slices remain sequenced roadmap work. Hosted collaboration remains out of scope unless real demand appears.
 
 ## License
 

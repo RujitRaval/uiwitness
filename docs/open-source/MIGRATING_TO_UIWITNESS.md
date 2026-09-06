@@ -62,6 +62,8 @@ UIWitness does not rename, copy, upload, or delete existing `.statecraft/` evide
 
 Do not move `.statecraft/` to `.uiwitness/`. UIWitness treats the roots as separate evidence histories and never accesses the legacy directory during a new run. Existing schema-v1 JSON can still be parsed and rendered programmatically with the UIWitness core and report packages, including screenshot references rooted under `.statecraft/artifacts/`; `uiwitness open` intentionally opens only the latest `.uiwitness/report/index.html`.
 
+Default screenshot retention still emits schema v1. Configuring `failures-only` or `none` intentionally emits schema v2, where `screenshot.status` distinguishes retained evidence, policy omission, and capture failure. Upgrade schema-v1-only consumers before enabling those policies.
+
 Delete old evidence only when you have reviewed it and deliberately decided it is no longer needed:
 
 ```bash

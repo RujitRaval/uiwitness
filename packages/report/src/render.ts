@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 
-import type { ReportExecutionResult } from "uiwitness-core";
+import {
+  parseEvidenceManifest,
+  parseAnyReport,
+  serializeEvidenceManifest,
+  serializeReport,
+  type AnyReportExecutionResult,
+  type UIWitnessEvidenceManifest,
+} from "uiwitness-core";
 
 import {
   transformReport,
@@ -72,7 +79,7 @@ function diagnosticList(values: readonly string[], empty: string): string {
   return `<ul>${values.map((value) => `<li>${escapeHtml(value)}</li>`).join("")}</ul>`;
 }
 
-function requestList(execution: ReportExecutionResult): string {
+function requestList(execution: AnyReportExecutionResult): string {
   if (execution.diagnostics.failedRequests.length === 0) {
     return '<p class="empty-detail">No failed requests captured.</p>';
   }
@@ -84,7 +91,7 @@ function requestList(execution: ReportExecutionResult): string {
     .join("")}</ul>`;
 }
 
-function failures(execution: ReportExecutionResult): string {
+function failures(execution: AnyReportExecutionResult): string {
   if (execution.failures.length === 0) {
     return '<p class="empty-detail">No execution failures.</p>';
   }
@@ -105,6 +112,51 @@ function findingDomId(finding: ContractFindingView): string {
 
 function quantity(value: number, singular: string, plural = `${singular}s`): string {
   return `${value} ${value === 1 ? singular : plural}`;
+}
+
+function privacyPanel(manifest: UIWitnessEvidenceManifest): string {
+  const validated = parseEvidenceManifest(serializeEvidenceManifest(manifest));
+  const masks = validated.masks.length === 0
+    ? '<p class="empty-detail">No masks applied.</p>'
+    : `<ul>${validated.masks.map((mask) =>
+        `<li><code>${escapeHtml(mask.id)}</code> · ${escapeHtml(mask.cardinalities.join(", "))}</li>`
+      ).join("")}</ul>`;
+  return `<section class="privacy-panel" aria-labelledby="privacy-title">
+    <div><p class="eyebrow">Evidence privacy</p><h2 id="privacy-title">${escapeHtml(words(validated.retention))} retention</h2></div>
+    <dl>
+      <div><dt>Attempted</dt><dd>${validated.attempted}</dd></div>
+      <div><dt>Retained</dt><dd>${validated.captured}</dd></div>
+      <div><dt>Omitted</dt><dd>${validated.omitted}</dd></div>
+    </dl>
+    <div><h3>Successful masks</h3>${masks}</div>
+  </section>`;
+}
+
+function boundEvidenceManifest(
+  input: unknown,
+  manifest: UIWitnessEvidenceManifest,
+): UIWitnessEvidenceManifest {
+  const report = parseAnyReport(input);
+  const validated = parseEvidenceManifest(serializeEvidenceManifest(manifest));
+  const reportDigest = `sha256:${createHash("sha256")
+    .update(serializeReport(report))
+    .digest("hex")}`;
+  const retention = report.schemaVersion === 1
+    ? "all"
+    : report.evidence?.retention ?? "all";
+  const captured = report.schemaVersion === 1
+    ? report.executions.filter(({ screenshotPath }) => screenshotPath !== null).length
+    : report.executions.filter(({ screenshot }) => screenshot.status === "captured").length;
+  const omitted = report.executions.length - captured;
+  if (
+    validated.reportDigest !== reportDigest ||
+    validated.retention !== retention ||
+    validated.captured !== captured ||
+    validated.omitted !== omitted
+  ) {
+    throw new TypeError("Evidence manifest does not match the report being rendered.");
+  }
+  return validated;
 }
 
 function contractSummary(view: ContractVerdictView): string {
@@ -268,7 +320,7 @@ function contractFindings(view: ContractVerdictView): string {
 
 function screenshot(cell: ReportCellView, className: string): string {
   if (cell.screenshotHref === null) {
-    return '<div class="screenshot-missing">Screenshot unavailable</div>';
+    return `<div class="screenshot-missing">${cell.screenshotStatus === "omitted-by-policy" ? "Screenshot omitted by retention policy" : "Screenshot capture failed"}</div>`;
   }
   const execution = cell.execution;
   const alt = `${words(execution.routeId)} ${words(execution.stateId)}, ${words(execution.viewportId)}, ${words(execution.theme)} theme`;
@@ -767,7 +819,7 @@ body.detail-open{overflow:hidden}.shell{width:100%;max-width:none;margin:0;paddi
 .hero h1{max-width:none;margin:10px 0 0;color:var(--text);font-family:Georgia,"Times New Roman",serif;font-size:clamp(4.5rem,12vw,12rem);font-weight:400;line-height:.72;letter-spacing:-.075em;text-wrap:balance}
 .lede{max-width:58rem;margin:clamp(42px,7vh,88px) 0 0;color:var(--text);font-size:clamp(1.05rem,2vw,1.85rem);line-height:1.2;letter-spacing:-.025em}
 .score{position:relative;padding:18px 0 0;border:0;border-top:2px solid var(--line);border-radius:0;background:none;box-shadow:none}.score:before{position:absolute;top:-2px;left:0;width:30%;height:8px;background:var(--accent);content:""}.score strong{display:flex;align-items:flex-start;color:var(--text);font-family:Georgia,"Times New Roman",serif;font-size:clamp(5rem,11vw,11rem);font-weight:400;line-height:.75;letter-spacing:-.09em}.score strong span{padding-top:.12em;font:800 clamp(1rem,2vw,2rem)/1 "Avenir Next","Segoe UI Variable",Ubuntu,sans-serif;letter-spacing:0}.score p{max-width:24rem;margin:26px 0 0;font-size:clamp(1rem,1.4vw,1.25rem);font-weight:750;line-height:1.2}
-.run-meta{display:flex;margin:0;padding:13px clamp(20px,3.4vw,64px);border-bottom:1px solid var(--line);background:var(--line);color:var(--bg);font:650 .6875rem/1.4 ui-monospace,"SFMono-Regular",Menlo,monospace;letter-spacing:.04em}.run-meta code{color:inherit}
+.run-meta{display:flex;margin:0;padding:13px clamp(20px,3.4vw,64px);border-bottom:1px solid var(--line);background:var(--line);color:var(--bg);font:650 .6875rem/1.4 ui-monospace,"SFMono-Regular",Menlo,monospace;letter-spacing:.04em}.run-meta code{color:inherit}.privacy-panel{display:grid;grid-template-columns:minmax(240px,1.2fr) minmax(260px,1fr) minmax(240px,1fr);gap:clamp(20px,3vw,48px);padding:clamp(24px,3.4vw,56px);border-bottom:2px solid var(--line)}.privacy-panel h2,.privacy-panel h3{margin:0}.privacy-panel h2{font-size:clamp(2rem,4vw,4rem);line-height:.9;letter-spacing:-.055em}.privacy-panel h3{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase}.privacy-panel dl{display:grid;grid-template-columns:repeat(3,1fr);margin:0}.privacy-panel dl div{padding:12px;border-left:1px solid var(--line)}.privacy-panel dt{font:700 .7rem/1 ui-monospace,"SFMono-Regular",Menlo,monospace;text-transform:uppercase}.privacy-panel dd{margin:8px 0 0;font-size:2rem;font-weight:800}.privacy-panel ul{padding-left:18px}.privacy-panel code{color:var(--accent)}
 .run-tape{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;margin:0;border-bottom:2px solid var(--line);background:var(--bg)}.metric{min-width:0;padding:clamp(16px,2vw,34px) clamp(12px,1.5vw,28px);border:0;border-right:1px solid var(--line);border-radius:0;background:transparent}.metric:last-child{border-right:0}.metric span{color:var(--muted);font:800 .6875rem/1.2 ui-monospace,"SFMono-Regular",Menlo,monospace;letter-spacing:.14em}.metric strong{margin-top:10px;color:var(--text);font-family:Georgia,"Times New Roman",serif;font-size:clamp(2rem,4vw,5rem);font-weight:400;line-height:.85;letter-spacing:-.06em}.metric--failed{background:var(--fail)}.metric--failed span,.metric--failed strong{color:#0b0c0a}
 .contract-score strong{font-variant-numeric:tabular-nums}.contract-score strong span{padding-top:.42em;font-size:clamp(1rem,2vw,2rem);letter-spacing:-.02em}.contract-lede{font-family:ui-monospace,"SFMono-Regular",Menlo,monospace;font-size:clamp(.9rem,1.4vw,1.15rem);letter-spacing:.015em}.contract-hero h1{text-transform:uppercase}body[data-contract-verdict="failed"] .contract-score:before,body[data-contract-verdict="error"] .contract-score:before{background:var(--fail)}
 .contract-findings{border-bottom:2px solid var(--line);background:var(--bg);scroll-margin-top:1rem}.contract-findings-heading{padding-top:clamp(64px,9vw,132px)}.findings-list{margin:0;padding:0;border-top:2px solid var(--line);list-style:none}.finding{position:relative;margin:0;padding:clamp(22px,3vw,46px) clamp(20px,3.4vw,64px);overflow:hidden;border-bottom:1px solid var(--line)}.finding:last-child{border-bottom:0}.finding:before{position:absolute;top:0;bottom:0;left:0;width:7px;background:var(--warning);content:""}.finding--critical:before{background:var(--fail)}.finding--calm:before{background:var(--accent)}.finding-heading{display:flex;align-items:start;justify-content:space-between;gap:24px}.finding-heading h3{max-width:100%;margin:0;font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.8rem,4vw,4.5rem);font-weight:400;line-height:.95;letter-spacing:-.045em;overflow-wrap:anywhere}.finding-heading h3 a{text-decoration-thickness:1px;text-underline-offset:.16em}.finding-heading h3 a:visited{color:#23634f}.finding-kind{flex:none;padding:7px 9px;border:1px solid currentColor;font:800 .6875rem/1.2 ui-monospace,"SFMono-Regular",Menlo,monospace;letter-spacing:.08em;text-transform:uppercase}.finding--critical .finding-kind{background:var(--fail);color:#0b0c0a}.finding--warning .finding-kind{background:var(--warning);color:#0b0c0a}.finding-outcome,.exception-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-width:72rem;margin:clamp(20px,3vw,36px) 0 0;border-top:1px solid var(--line)}.finding-outcome>div,.exception-meta>div{min-width:0;padding:12px 16px 12px 0;border-bottom:1px solid var(--line)}.finding-outcome>div:nth-child(odd),.exception-meta>div:nth-child(odd){border-right:1px solid var(--line)}.finding-outcome>div:nth-child(even),.exception-meta>div:nth-child(even){padding-left:16px}.finding-outcome dt,.exception-meta dt,.finding-command>span{color:var(--muted);font:800 .6875rem/1.2 ui-monospace,"SFMono-Regular",Menlo,monospace;letter-spacing:.12em;text-transform:uppercase}.finding-outcome dd,.exception-meta dd{margin:6px 0 0;overflow-wrap:anywhere}.exception-meta{grid-template-columns:minmax(150px,1fr) minmax(240px,2fr) minmax(220px,1fr)}.exception-meta>div:nth-child(2){border-right:1px solid var(--line)}.exception-lifecycle{display:block;margin-top:6px;color:var(--muted);font:800 .6875rem/1.3 ui-monospace,"SFMono-Regular",Menlo,monospace;letter-spacing:.04em;text-transform:uppercase}.exception-guidance{max-width:72rem;margin:18px 0 0;padding:14px 16px;border-left:3px solid var(--warning);background:color-mix(in srgb,var(--warning) 10%,transparent)}.finding--critical .exception-guidance{border-left-color:var(--fail);background:color-mix(in srgb,var(--fail) 8%,transparent)}.finding-commands{max-width:72rem;margin-top:24px;border-top:1px solid var(--line)}.finding-command{display:grid;grid-template-columns:120px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.finding-command code{min-width:0;font-size:.78rem;overflow-wrap:anywhere;user-select:text}.finding-command button{min-width:72px;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:0;background:transparent;color:var(--text);font:800 .75rem/1 ui-monospace,"SFMono-Regular",Menlo,monospace;cursor:pointer}.finding-command button:hover,.finding-command button.is-copied{background:var(--focus);color:#fff}.finding-command button:focus-visible,.finding-heading a:focus-visible{outline:3px solid var(--focus);outline-offset:3px}html:not(.js) [data-copy-target]{display:none}.contract-clear{display:flex;justify-content:space-between;gap:24px;padding:clamp(24px,4vw,52px) clamp(20px,3.4vw,64px);border-top:2px solid var(--line)}.contract-clear strong{font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.7rem,3vw,3.5rem);font-weight:400}.contract-clear span{max-width:30rem}.contract-details{margin:0;padding:0 clamp(20px,3.4vw,64px);border-top:1px solid var(--line)}.contract-details summary{min-height:64px;padding:20px 0;font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.2rem,2vw,2rem);cursor:pointer}.contract-details dl{margin:0;padding-bottom:28px}.contract-details dl div{display:grid;grid-template-columns:140px minmax(0,1fr);gap:16px;padding:10px 0;border-top:1px solid color-mix(in srgb,var(--line) 30%,transparent)}.contract-details dt{color:var(--muted);font:800 .6875rem/1.2 ui-monospace,"SFMono-Regular",Menlo,monospace;letter-spacing:.1em;text-transform:uppercase}.contract-details dd{min-width:0;margin:0;overflow-wrap:anywhere}.copy-status{position:fixed;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
@@ -790,13 +842,14 @@ body.detail-open{overflow:hidden}.shell{width:100%;max-width:none;margin:0;paddi
 .diagnostics{display:block;margin-top:clamp(44px,6vw,96px)}.diagnostics details{border:0;border-top:1px solid #55584f;border-radius:0;background:transparent}.diagnostics details:last-child{border-bottom:1px solid #55584f}.diagnostics summary{min-height:64px;padding:12px 0;font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.2rem,2.2vw,2.5rem);font-weight:400}.diagnostics summary strong{border:1px solid #55584f;border-radius:0;background:transparent;color:var(--bone);font-family:ui-monospace,"SFMono-Regular",Menlo,monospace}.diagnostic-body{padding:0 0 24px;border:0}.diagnostic-body ul{color:var(--bone)}.diagnostic-body span,.empty-detail{color:#a8ad9f}.back-link,.back-link:visited{color:var(--accent)}
 .empty-report{padding:64px clamp(20px,3.4vw,64px);border:0;border-bottom:2px solid var(--line);border-radius:0;background:var(--bg);box-shadow:none}.footer{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;min-height:45vh;margin:0;padding:clamp(40px,5vw,80px) clamp(20px,3.4vw,64px);background:var(--line);color:var(--bg);text-align:left}.footer strong{font-family:Georgia,"Times New Roman",serif;font-size:clamp(4rem,12vw,12rem);font-weight:400;line-height:.7;letter-spacing:-.08em}.footer span{max-width:24rem;font:650 .75rem/1.4 ui-monospace,"SFMono-Regular",Menlo,monospace;letter-spacing:.06em;text-transform:uppercase}
 @media(max-width:1000px){.hero{min-height:auto}.hero-verdict{grid-template-columns:1fr}.score{max-width:none}.run-tape{grid-template-columns:repeat(3,1fr)}.metric:nth-child(3){border-right:0}.metric:nth-child(-n+3){border-bottom:1px solid var(--line)}.detail-layout{grid-template-columns:1fr}.evidence{border-right:0;border-bottom:1px solid #55584f}.metadata{padding:24px 0}.footer{align-items:flex-start;flex-direction:column}}
-@media(max-width:700px){body{background-image:none}.shell{width:100%;padding:0}.hero{padding:14px 14px 50px}.masthead>span{max-width:11rem;text-align:right}.hero-verdict{margin-top:58px}.hero-verdict>*{min-width:0}.hero h1{font-size:clamp(4rem,20vw,7rem);line-height:.78}.contract-hero h1{font-size:clamp(3.3rem,17vw,7rem)}.score strong{font-size:clamp(5rem,28vw,9rem)}.lede{margin-top:44px}.run-meta{display:grid;padding:12px 14px}.run-tape{grid-template-columns:repeat(2,1fr)}.metric{padding:16px 14px;border-right:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important}.metric:nth-child(even){border-right:0!important}.metric:nth-last-child(-n+2){border-bottom:0!important}.filter-rail{position:relative;padding:20px 14px}.filters-heading{gap:8px}}
+@media(max-width:700px){body{background-image:none}.shell{width:100%;padding:0}.hero{padding:14px 14px 50px}.masthead>span{max-width:11rem;text-align:right}.hero-verdict{margin-top:58px}.hero-verdict>*{min-width:0}.hero h1{font-size:clamp(4rem,20vw,7rem);line-height:.78}.contract-hero h1{font-size:clamp(3.3rem,17vw,7rem)}.score strong{font-size:clamp(5rem,28vw,9rem)}.lede{margin-top:44px}.run-meta{display:grid;padding:12px 14px}.privacy-panel{grid-template-columns:1fr;padding:30px 14px}.privacy-panel dl div:first-child{border-left:0}.run-tape{grid-template-columns:repeat(2,1fr)}.metric{padding:16px 14px;border-right:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important}.metric:nth-child(even){border-right:0!important}.metric:nth-last-child(-n+2){border-bottom:0!important}.filter-rail{position:relative;padding:20px 14px}.filters-heading{gap:8px}}
 @media(max-width:700px){.matrix-panel{padding:72px 0 0}.section-heading{padding:0 14px 24px}.section-heading h2{font-size:clamp(3.5rem,19vw,6.5rem)}.matrix-scroll{overflow:visible;border-left:0;border-right:0}.matrix-scroll tr{grid-template-columns:minmax(0,1fr);gap:12px;padding:18px 0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent}.matrix-scroll tbody+tbody{margin-top:0}.matrix-scroll .state-heading{padding:0 14px 8px}.matrix-scroll td{padding:0 6px}.matrix-cell,.filtered-cell{min-height:170px;border-radius:0}.thumbnail{width:100%;max-width:calc(100vw - 12px);height:136px}.matrix-cell--failed{transform:translate(3px,-3px);box-shadow:-4px 4px 0 var(--fail)}.detail{padding:18px 14px}.detail-utility{margin:-18px -14px 38px;padding:0 14px}.detail-heading{align-items:flex-start}.detail-heading h2{font-size:clamp(3.2rem,18vw,6rem)}.footer{min-height:50vh;padding:48px 14px}.footer strong{font-size:clamp(4rem,22vw,8rem)}}
 @media(max-width:760px){.contract-findings-heading{padding-top:72px}.finding-filter-rail{grid-template-columns:1fr;padding:18px 14px}#finding-filters{grid-template-columns:1fr}.finding-filter-rail>p{justify-self:start}.finding{padding:24px 14px}.finding-heading,.contract-clear{align-items:flex-start;flex-direction:column}.finding-kind{order:-1}.finding-outcome,.exception-meta{grid-template-columns:1fr}.finding-outcome>div,.finding-outcome>div:nth-child(even),.exception-meta>div,.exception-meta>div:nth-child(even){padding:12px 0;border-right:0}.finding-command{grid-template-columns:1fr auto;gap:8px}.finding-command>span{grid-column:1/-1}.finding-command code{font-size:.72rem}.contract-details{padding:0 14px}.contract-details dl div{grid-template-columns:1fr;gap:5px}}
 @media(prefers-color-scheme:dark){:root{--bg:#11140f;--panel:#11140f;--panel-2:#171a16;--line:#eef0e8;--text:#f4f0e6;--muted:#a6aa9f}.metric--failed span,.metric--failed strong{color:#0b0c0a}.run-meta,.footer{background:var(--line);color:var(--bg)}.cell-status,thead th{background:var(--line);color:var(--bg)}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.matrix-cell,.thumbnail{transition:none}.matrix-cell:hover,.matrix-cell--failed,.matrix-cell--failed:hover{transform:none}.js .detail.is-active{animation:none}}
 .eyebrow,.masthead,.run-meta,.metric span,thead th,.detail-utility{font-size:.75rem}
 #matrix-title{scroll-margin-top:14rem}
+@media(max-width:1000px){.privacy-panel{grid-template-columns:1fr}.privacy-panel>div{min-width:0}}
 @media(min-width:1001px){.detail-layout{grid-template-columns:minmax(0,8fr) minmax(320px,4fr)}}
 @media(max-width:700px){#matrix-title{scroll-margin-top:1rem}.matrix-cell,.filtered-cell{width:calc(100% - 12px)}.matrix-cell--failed:after{right:0;width:100%}}
 `;
@@ -810,6 +863,9 @@ export function renderReportHtml(
   const contract = options.contractVerdict === undefined
     ? null
     : transformContractVerdict(options.contractVerdict);
+  const evidenceManifest = options.evidenceManifest === undefined
+    ? undefined
+    : boundEvidenceManifest(input, options.evidenceManifest);
   const summary = view.summary;
   return `<!doctype html>
 <html lang="en">
@@ -836,6 +892,7 @@ export function renderReportHtml(
       <p class="lede">Route × state × viewport × theme. One local report. No green average hiding the frame that failed.</p>` : contractHero(contract)}
     </header>
     <p class="run-meta"><span>Generated <code>${escapeHtml(view.generatedAt)}</code></span><span>Base URL <code>${escapeHtml(view.baseURL)}</code></span>${contract === null ? "" : `<span>Run <code>${escapeHtml(contract.runDigest.slice(0, 19))}…</code></span>`}</p>
+    ${evidenceManifest === undefined ? "" : privacyPanel(evidenceManifest)}
     <section class="run-tape summary" aria-label="Report summary">
       <div class="metric"><span>Routes</span><strong>${summary.routes}</strong></div>
       <div class="metric"><span>States</span><strong>${summary.states}</strong></div>

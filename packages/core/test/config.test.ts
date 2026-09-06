@@ -71,6 +71,69 @@ describe("parseConfig", () => {
     expect(parseConfig(config)).toEqual(config);
   });
 
+  it("normalizes evidence defaults and accepts the selector length boundary", () => {
+    const config = parseConfig({
+      ...validConfig(),
+      evidence: {
+        masks: [{ id: "private", selector: "x".repeat(1_024) }],
+      },
+    });
+
+    expect(config.evidence).toEqual({
+      masks: [{
+        id: "private",
+        required: true,
+        selector: "x".repeat(1_024),
+      }],
+      retention: "all",
+    });
+  });
+
+  it.each([
+    ["overlong selector", { id: "private", selector: "x".repeat(1_025) }, "$.evidence.masks[0].selector"],
+    ["fractional count", { count: 1.5, id: "private", selector: "main" }, "$.evidence.masks[0].count"],
+    ["non-boolean required", { id: "private", required: "yes", selector: "main" }, "$.evidence.masks[0].required"],
+    ["duplicate route scope", { id: "private", routeIds: ["dashboard", "dashboard"], selector: "main" }, "$.evidence.masks[0].routeIds[1]"],
+    ["unknown state", { id: "private", selector: "main", stateIds: ["missing"] }, "$.evidence.masks[0].stateIds[0]"],
+    ["unknown property", { id: "private", selector: "main", telemetry: true }, "$.evidence.masks[0]"],
+  ])("rejects evidence mask %s", (_label, mask, expectedPath) => {
+    const error = captureValidationError({
+      ...validConfig(),
+      evidence: { masks: [mask] },
+    });
+
+    expect(error.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: expectedPath }),
+    ]));
+  });
+
+  it("rejects a known state outside the mask's scoped routes", () => {
+    const config = validConfig();
+    const error = captureValidationError({
+      ...config,
+      evidence: {
+        masks: [{
+          id: "private",
+          routeIds: ["dashboard"],
+          selector: "main",
+          stateIds: ["settings"],
+        }],
+      },
+      routes: [
+        ...config.routes,
+        {
+          id: "settings",
+          path: "/settings",
+          states: [{ id: "settings", setup: "./settings.mjs" }],
+        },
+      ],
+    });
+
+    expect(error.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "$.evidence.masks[0].stateIds[0]" }),
+    ]));
+  });
+
   it("normalizes strict shared-read-only authentication origins", () => {
     const config = parseConfig({
       ...validConfig(),

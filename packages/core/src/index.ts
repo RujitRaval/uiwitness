@@ -5,6 +5,16 @@ export {
 } from "./canonical-json.js";
 export type { JsonValue, Sha256Digest } from "./canonical-json.js";
 export {
+  EVIDENCE_MANIFEST_PATH,
+  EVIDENCE_MANIFEST_SCHEMA_VERSION,
+  parseEvidenceManifest,
+  serializeEvidenceManifest,
+} from "./evidence.js";
+export type {
+  EvidenceManifestMask,
+  UIWitnessEvidenceManifest,
+} from "./evidence.js";
+export {
   CONTRACT_DIGEST_ALGORITHM,
   CONTRACT_FAILURE_CODES,
   CONTRACT_SCHEMA_VERSION,
@@ -58,17 +68,27 @@ export {
   COMMITTED_GENERATION_SCHEMA_VERSION,
   GENERATION_ARTIFACT_ROLES,
   GENERATION_MANIFEST_SCHEMA_VERSION,
+  PRIVACY_GENERATION_ARTIFACT_ROLES,
+  PRIVACY_GENERATION_MANIFEST_SCHEMA_VERSION,
   generationManifestDigest,
+  parseAnyGenerationManifest,
   parseCommittedGeneration,
   parseGenerationManifest,
+  parsePrivacyGenerationManifest,
   serializeCommittedGeneration,
   serializeGenerationManifest,
+  serializePrivacyGenerationManifest,
 } from "./generation.js";
 export type {
+  AnyGenerationArtifactRole,
+  AnyUIWitnessGenerationManifest,
   GenerationArtifactDescriptor,
   GenerationArtifactRole,
+  PrivacyGenerationArtifactDescriptor,
+  PrivacyGenerationArtifactRole,
   UIWitnessCommittedGeneration,
   UIWitnessGenerationManifest,
+  UIWitnessGenerationManifestV2,
 } from "./generation.js";
 export type {
   ContractProposal,
@@ -108,6 +128,8 @@ export {
   validateAuthenticationStorageState,
 } from "./authentication.js";
 export type {
+  EvidenceConfig,
+  EvidenceMaskConfig,
   FailurePolicy,
   RouteDefinition,
   StateDefinition,
@@ -160,12 +182,16 @@ export type {
   CoverageSummary,
 } from "./coverage.js";
 export {
+  PRIVACY_REPORT_SCHEMA_VERSION,
   REPORT_SCHEMA_VERSION,
+  parseAnyReport,
   parseExecutionResult,
   parseReport,
   serializeReport,
 } from "./results.js";
 export type {
+  AnyUIWitnessReport,
+  AnyReportExecutionResult,
   ExecutionDiagnostics,
   ExecutionFailure,
   ExecutionFailureCode,
@@ -173,6 +199,10 @@ export type {
   ExecutionStatus,
   FailedRequestDiagnostic,
   ReportExecutionResult,
+  ReportExecutionResultV2,
+  ReportScreenshot,
   ReportSummary,
   UIWitnessReport,
+  UIWitnessReportV1,
+  UIWitnessReportV2,
 } from "./results.js";

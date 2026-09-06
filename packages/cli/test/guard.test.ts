@@ -17,10 +17,12 @@ import { pathToFileURL } from "node:url";
 
 import {
   contractConfigDigest,
+  parseAnyReport,
   parseConfig,
   parseContractProposal,
   parseReport,
   type ContractConfigurationCoordinate,
+  type AnyUIWitnessReport,
   type UIWitnessContract,
   type UIWitnessReport,
 } from "uiwitness-core";
@@ -65,6 +67,7 @@ async function fixture(options: {
   readonly authentication?: boolean;
   readonly configDirectory?: string;
   readonly configFilename?: string;
+  readonly evidence?: boolean;
   readonly routePath?: string;
 } = {}): Promise<GuardFixture> {
   const project = await temporaryProject();
@@ -88,6 +91,7 @@ async function fixture(options: {
     `export default {
   ${options.authentication === true ? 'authentication: { additionalOrigins: ["https://id.example.test"], cookieScopes: [{ domain: ".example.test", pathPrefix: "/account", secure: "required", partitionKeys: ["https://example.test"] }], setup: "./auth.mjs" },' : ""}
   baseURL: "https://example.test",
+  ${options.evidence === true ? 'evidence: { retention: "failures-only", masks: [{ id: "account-name", selector: "[data-private=name]", routeIds: ["home"], stateIds: ["success"], count: 1 }] },' : ""}
   routes: [{ id: "home", path: ${JSON.stringify(options.routePath ?? "/?token=secret#private")}, states: [{ id: "success", setup: "./scenario.mjs" }] }],
   themes: ["light"],
   viewports: { desktop: { height: 900, width: 1440 } },
@@ -168,11 +172,63 @@ function report(
   });
 }
 
-function mockRunReport(value: UIWitnessReport, once = false): void {
+function privacyReport(
+  configuration: readonly ContractConfigurationCoordinate[],
+  status: "failed" | "passed",
+  screenshot: { readonly path: string; readonly status: "captured" } |
+    { readonly status: "capture-failed" | "omitted-by-policy" },
+  retention: "failures-only" | "none" = "failures-only",
+): AnyUIWitnessReport {
+  const coordinate = configuration[0]!;
+  const passed = status === "passed";
+  const covered = passed ? 1 : 0;
+  return parseAnyReport({
+    evidence: { retention },
+    executions: [{
+      diagnostics: {
+        consoleErrors: [],
+        failedRequests: [],
+        navigationStatus: 200,
+        pageErrors: [],
+      },
+      durationMs: 17,
+      failures: passed ? [] : [{ code: "ASSERTION_FAILED", message: "Expected heading." }],
+      routeId: coordinate.routeId,
+      routePath: coordinate.routePath,
+      scenarioSource: coordinate.scenarioSource,
+      screenshot,
+      stateId: coordinate.stateId,
+      status,
+      theme: coordinate.theme,
+      url: "https://example.test/",
+      viewport: coordinate.viewport,
+      viewportId: coordinate.viewportId,
+    }],
+    generatedAt: "2026-09-03T12:00:00.000Z",
+    project: { baseURL: "https://example.test" },
+    schemaVersion: 2,
+    summary: {
+      coverage: {
+        execution: { covered, percentage: covered * 100, total: 1 },
+        responsive: { covered, percentage: covered * 100, total: 1 },
+        state: { covered, percentage: covered * 100, total: 1 },
+        theme: { covered, percentage: covered * 100, total: 1 },
+      },
+      durationMs: 17,
+      executions: 1,
+      failed: passed ? 0 : 1,
+      passed: passed ? 1 : 0,
+      routes: 1,
+      states: 1,
+    },
+  });
+}
+
+function mockRunReport(value: AnyUIWitnessReport, once = false): void {
   const implementation = async (
     _cells: unknown,
     options: {
-      readonly finalizeGeneration?: ((report: UIWitnessReport) => unknown) | undefined;
+      readonly finalizeGeneration?: ((report: AnyUIWitnessReport) => unknown) | undefined;
       readonly projectDirectory: string;
     },
   ) => {
@@ -395,6 +451,136 @@ describe("guardProject", () => {
         setupBaseDirectory: value.project,
       },
     });
+  });
+
+  it("includes canonical evidence policy in fingerprint v2 and runner options", async () => {
+    const value = await fixture({ evidence: true });
+    const configuration = await fixtureConfiguration(value);
+    expect(configuration[0]!.configFingerprint).not.toBe(
+      "sha256:32bf5d713eb274706576a0a083a89dc05df287716e29ffd6201000129d37359c",
+    );
+    mockRunReport(report(configuration, "passed"));
+
+    await guardProject({
+      cwd: value.project,
+      now: () => new Date("2026-09-03T12:00:00.000Z"),
+    });
+    expect(runPersistedScenarioCellsMock.mock.calls[0]![1]).toMatchObject({
+      evidence: {
+        masks: [{
+          count: 1,
+          id: "account-name",
+          required: true,
+          routeIds: ["home"],
+          selector: "[data-private=name]",
+          stateIds: ["success"],
+        }],
+        retention: "failures-only",
+      },
+    });
+  });
+
+  it("canonicalizes evidence ordering and fingerprints every privacy-policy change", async () => {
+    const project = await temporaryProject("uiwitness-cli-guard-evidence-fingerprint-");
+    const configPath = join(project, "uiwitness.config.mjs");
+    await Promise.all([
+      writeFile(configPath, "export default {};\n", "utf8"),
+      writeFile(join(project, "home.mjs"), "export default {};\n", "utf8"),
+      writeFile(join(project, "settings.mjs"), "export default {};\n", "utf8"),
+    ]);
+    const base = {
+      baseURL: "https://example.test",
+      routes: [
+        { id: "home", path: "/", states: [{ id: "success", setup: "./home.mjs" }] },
+        { id: "settings", path: "/settings", states: [{ id: "empty", setup: "./settings.mjs" }] },
+      ],
+      themes: ["light"],
+      viewports: { desktop: { height: 900, width: 1_440 } },
+    } as const;
+    const privateMask = {
+      count: 1,
+      id: "private",
+      routeIds: ["home", "settings"],
+      selector: "[data-private]",
+      stateIds: ["success", "empty"],
+    } as const;
+    const tokenMask = { id: "token", selector: "[data-token]" } as const;
+    const primary = await guardConfiguration(parseConfig({
+      ...base,
+      evidence: { masks: [privateMask, tokenMask], retention: "failures-only" },
+    }), configPath, project);
+    const permuted = await guardConfiguration(parseConfig({
+      ...base,
+      evidence: {
+        masks: [tokenMask, {
+          ...privateMask,
+          routeIds: ["settings", "home"],
+          stateIds: ["empty", "success"],
+        }],
+        retention: "failures-only",
+      },
+    }), configPath, project);
+    const changedRetention = await guardConfiguration(parseConfig({
+      ...base,
+      evidence: { masks: [privateMask, tokenMask], retention: "none" },
+    }), configPath, project);
+    const changedSelector = await guardConfiguration(parseConfig({
+      ...base,
+      evidence: {
+        masks: [{ ...privateMask, selector: "[data-private-alt]" }, tokenMask],
+        retention: "failures-only",
+      },
+    }), configPath, project);
+
+    expect(permuted.map(({ configFingerprint }) => configFingerprint)).toEqual(
+      primary.map(({ configFingerprint }) => configFingerprint),
+    );
+    expect(changedRetention[0]!.configFingerprint).not.toBe(
+      primary[0]!.configFingerprint,
+    );
+    expect(changedSelector[0]!.configFingerprint).not.toBe(
+      primary[0]!.configFingerprint,
+    );
+    const semanticMaskChanges = [
+      { ...privateMask, id: "private-alt" },
+      { ...privateMask, count: 2 },
+      { ...privateMask, required: false },
+      { ...privateMask, routeIds: undefined },
+      { ...privateMask, stateIds: undefined },
+    ];
+    for (const changedMask of semanticMaskChanges) {
+      const changed = await guardConfiguration(parseConfig({
+        ...base,
+        evidence: {
+          masks: [changedMask, tokenMask],
+          retention: "failures-only",
+        },
+      }), configPath, project);
+      expect(changed[0]!.configFingerprint).not.toBe(
+        primary[0]!.configFingerprint,
+      );
+    }
+  });
+
+  it("projects every schema-v2 screenshot state into guard evidence identity", async () => {
+    const value = await fixture({ evidence: true });
+    const configuration = await fixtureConfiguration(value);
+    const path = ".uiwitness/artifacts/home/success/desktop-light.png";
+    const captured = privacyReport(configuration, "failed", {
+      path,
+      status: "captured",
+    });
+    const captureFailed = privacyReport(configuration, "failed", {
+      status: "capture-failed",
+    });
+    const omitted = privacyReport(configuration, "failed", {
+      status: "omitted-by-policy",
+    }, "none");
+
+    const capturedDigest = guardRunDigest(configuration, captured);
+    const captureFailedDigest = guardRunDigest(configuration, captureFailed);
+    expect(capturedDigest).not.toBe(captureFailedDigest);
+    expect(guardRunDigest(configuration, omitted)).toBe(captureFailedDigest);
   });
 
   it("normalizes execution, failure, diagnostic, and request ordering in run digests", async () => {

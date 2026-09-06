@@ -26,11 +26,20 @@ export type {
   RejectedCellExecution,
   RunExecutionCellsOptions,
 } from "./lifecycle.js";
-export { runCapturedScenarioCells, ScenarioCaptureError } from "./capture.js";
+export {
+  EvidencePolicyError,
+  runCapturedScenarioCells,
+  ScenarioCaptureError,
+} from "./capture.js";
 export type {
+  AppliedEvidenceMask,
   AssertionStatus,
   CapturedScenarioCell,
+  CompletedScenarioCell,
   DroppedDiagnosticCounts,
+  EvidenceScreenshotStatus,
+  OmittedScenarioCell,
+  PrivacyRunCapturedScenarioCellsOptions,
   RunCapturedScenarioCellsOptions,
   ScenarioCaptureEvidence,
 } from "./capture.js";
@@ -39,11 +48,15 @@ export {
   withGenerationTransactionLock,
 } from "./persistence.js";
 export type {
+  AnyPersistedScenarioRun,
   GenerationArtifactPublication,
   GenerationFinalization,
   GenerationFinalizer,
   GenerationSidecarArtifact,
   PersistedScenarioRun,
+  PrivacyGenerationFinalizer,
+  PrivacyPersistedScenarioRun,
+  PrivacyRunPersistedScenarioCellsOptions,
   RunPersistedScenarioCellsOptions,
 } from "./persistence.js";
 export {

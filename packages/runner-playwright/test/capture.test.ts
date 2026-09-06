@@ -540,6 +540,262 @@ describe("runCapturedScenarioCells", () => {
     }
   });
 
+  it("applies scoped masks before capture with the approved opaque color", async () => {
+    const eventKey = Symbol.for("uiwitness.test.capture-events");
+    const events: string[] = [];
+    Reflect.set(globalThis, eventKey, events);
+    try {
+      const outcomes = await runCapturedScenarioCells(
+        captureCells(["mask-apply-fail"]),
+        {
+          baseURL,
+          evidence: {
+            masks: [{ count: 1, id: "private-main", selector: "main" }],
+            retention: "all",
+          },
+          scenarioBaseDirectory,
+        },
+      );
+      const reason = captureReason(outcomes[0]!);
+      expect(reason.failures.map(({ code }) => code)).toEqual([
+        "MASK_APPLY_FAILED",
+      ]);
+      expect(reason.evidence).toMatchObject({
+        masks: [],
+        screenshot: null,
+        screenshotAttempted: true,
+        screenshotStatus: "capture-failed",
+      });
+      expect(events).toEqual(["masked-screenshot:#0b0c0a:2"]);
+    } finally {
+      Reflect.deleteProperty(globalThis, eventKey);
+    }
+  });
+
+  it.each([
+    ["[", "MASK_SELECTOR_INVALID"],
+    ["#missing", "MASK_REQUIRED_MISSING"],
+  ])("fails closed for mask selector %s", async (selector, code) => {
+    Reflect.set(globalThis, Symbol.for("uiwitness.test.capture-events"), []);
+    try {
+      const outcomes = await runCapturedScenarioCells(captureCells(["ordered"]), {
+        baseURL,
+        evidence: { masks: [{ id: "private", selector }], retention: "all" },
+        scenarioBaseDirectory,
+      });
+      const reason = captureReason(outcomes[0]!);
+      expect(reason.failures.map((failure) => failure.code)).toEqual([code]);
+      expect(reason.evidence).toMatchObject({
+        screenshot: null,
+        screenshotAttempted: false,
+        screenshotStatus: "capture-failed",
+      });
+    } finally {
+      Reflect.deleteProperty(globalThis, Symbol.for("uiwitness.test.capture-events"));
+    }
+  });
+
+  it("enforces exact cardinality and allows optional zero-match masks", async () => {
+    Reflect.set(globalThis, Symbol.for("uiwitness.test.capture-events"), []);
+    try {
+      const mismatch = await runCapturedScenarioCells(captureCells(["ordered"]), {
+        baseURL,
+        evidence: { masks: [{ count: 2, id: "private", selector: "main" }] },
+        scenarioBaseDirectory,
+      });
+      expect(captureReason(mismatch[0]!).failures[0]?.code).toBe(
+        "MASK_CARDINALITY_MISMATCH",
+      );
+
+      const optional = await runCapturedScenarioCells(captureCells(["ordered"]), {
+        baseURL,
+        evidence: {
+          masks: [{ id: "optional", required: false, selector: "#missing" }],
+        },
+        scenarioBaseDirectory,
+      });
+      expect(fulfilledValue(optional[0]!).masks).toEqual([
+        { count: 0, id: "optional" },
+      ]);
+    } finally {
+      Reflect.deleteProperty(globalThis, Symbol.for("uiwitness.test.capture-events"));
+    }
+  });
+
+  it("binds masks to the validated DOM nodes and discards bytes after DOM churn", async () => {
+    Reflect.set(globalThis, Symbol.for("uiwitness.test.capture-events"), []);
+    try {
+      const outcomes = await runCapturedScenarioCells(captureCells(["mask-dom-churn"]), {
+        baseURL,
+        evidence: { masks: [{ count: 1, id: "private", selector: "main" }] },
+        scenarioBaseDirectory,
+      });
+      const reason = captureReason(outcomes[0]!);
+      expect(reason.failures[0]?.code).toBe("MASK_APPLY_FAILED");
+      expect(reason.evidence).toMatchObject({
+        masks: [],
+        screenshot: null,
+        screenshotAttempted: true,
+        screenshotStatus: "capture-failed",
+      });
+    } finally {
+      Reflect.deleteProperty(globalThis, Symbol.for("uiwitness.test.capture-events"));
+    }
+  });
+
+  it("discards bytes when a selector gains an unmarked match during capture", async () => {
+    Reflect.set(globalThis, Symbol.for("uiwitness.test.capture-events"), []);
+    try {
+      const outcomes = await runCapturedScenarioCells(captureCells(["mask-dom-addition"]), {
+        baseURL,
+        evidence: { masks: [{ count: 1, id: "private", selector: "main" }] },
+        scenarioBaseDirectory,
+      });
+      const reason = captureReason(outcomes[0]!);
+      expect(reason.failures[0]?.code).toBe("MASK_APPLY_FAILED");
+      expect(reason.evidence).toMatchObject({
+        masks: [],
+        screenshot: null,
+        screenshotAttempted: true,
+        screenshotStatus: "capture-failed",
+      });
+    } finally {
+      Reflect.deleteProperty(globalThis, Symbol.for("uiwitness.test.capture-events"));
+    }
+  });
+
+  it("masks a matching node that exists only while the screenshot is captured", async () => {
+    const eventKey = Symbol.for("uiwitness.test.capture-events");
+    const events: string[] = [];
+    Reflect.set(globalThis, eventKey, events);
+    try {
+      const outcomes = await runCapturedScenarioCells(
+        captureCells(["mask-dom-transient-addition"]),
+        {
+          baseURL,
+          evidence: { masks: [{ count: 1, id: "private", selector: "main" }] },
+          scenarioBaseDirectory,
+        },
+      );
+      expect(fulfilledValue(outcomes[0]!)).toMatchObject({
+        masks: [{ count: 1, id: "private" }],
+        screenshotStatus: "captured",
+      });
+      expect(events).toContain("transient-masked-screenshot:2");
+    } finally {
+      Reflect.deleteProperty(globalThis, eventKey);
+    }
+  });
+
+  it("keeps an initially empty optional selector live during capture", async () => {
+    const eventKey = Symbol.for("uiwitness.test.capture-events");
+    const events: string[] = [];
+    Reflect.set(globalThis, eventKey, events);
+    try {
+      const outcomes = await runCapturedScenarioCells(
+        captureCells(["optional-mask-dom-transient-addition"]),
+        {
+          baseURL,
+          evidence: {
+            masks: [{
+              id: "optional-private",
+              required: false,
+              selector: "aside[data-optional-private]",
+            }],
+          },
+          scenarioBaseDirectory,
+        },
+      );
+      expect(fulfilledValue(outcomes[0]!)).toMatchObject({
+        masks: [{ count: 0, id: "optional-private" }],
+        screenshotStatus: "captured",
+      });
+      expect(events).toContain("optional-transient-masked-screenshot:1");
+    } finally {
+      Reflect.deleteProperty(globalThis, eventKey);
+    }
+  });
+
+  it("honors exact route/state scopes and masks matched hidden nodes", async () => {
+    const eventKey = Symbol.for("uiwitness.test.capture-events");
+    const events: string[] = [];
+    Reflect.set(globalThis, eventKey, events);
+    const cells = expandMatrix(parseConfig({
+      baseURL,
+      routes: [{
+        id: "capture",
+        path: "/capture",
+        states: [
+          { id: "hidden-mask", setup: "./capture.mjs" },
+          { id: "ordered", setup: "./capture.mjs" },
+        ],
+      }],
+      themes: ["light"],
+      viewports: { compact: { height: 240, width: 320 } },
+    }));
+    try {
+      const outcomes = await runCapturedScenarioCells(cells, {
+        baseURL,
+        evidence: {
+          masks: [{
+            count: 1,
+            id: "hidden-private",
+            routeIds: ["capture"],
+            selector: "aside[data-private]",
+            stateIds: ["hidden-mask"],
+          }],
+        },
+        scenarioBaseDirectory,
+      });
+      expect(fulfilledValue(outcomes[0]!).masks).toEqual([
+        { count: 1, id: "hidden-private" },
+      ]);
+      expect(fulfilledValue(outcomes[1]!).masks).toEqual([]);
+      expect(events).toContain("hidden-masked-screenshot:#0b0c0a:2");
+    } finally {
+      Reflect.deleteProperty(globalThis, eventKey);
+    }
+  });
+
+  it("omits passing bytes for failures-only and skips mask resolution for none", async () => {
+    Reflect.set(globalThis, Symbol.for("uiwitness.test.capture-events"), []);
+    try {
+      const failureOnly = await runCapturedScenarioCells(captureCells(["ordered"]), {
+        baseURL,
+        evidence: { retention: "failures-only" },
+        scenarioBaseDirectory,
+      });
+      expect(failureOnly[0]?.status).toBe("fulfilled");
+      if (failureOnly[0]?.status === "fulfilled") {
+        expect(failureOnly[0].value).toMatchObject({
+          screenshot: null,
+          screenshotAttempted: true,
+          screenshotStatus: "omitted-by-policy",
+        });
+      }
+
+      const none = await runCapturedScenarioCells(captureCells(["ordered"]), {
+        baseURL,
+        evidence: {
+          masks: [{ id: "never-resolved", selector: "[" }],
+          retention: "none",
+        },
+        scenarioBaseDirectory,
+      });
+      expect(none[0]?.status).toBe("fulfilled");
+      if (none[0]?.status === "fulfilled") {
+        expect(none[0].value).toMatchObject({
+          masks: [],
+          screenshot: null,
+          screenshotAttempted: false,
+          screenshotStatus: "omitted-by-policy",
+        });
+      }
+    } finally {
+      Reflect.deleteProperty(globalThis, Symbol.for("uiwitness.test.capture-events"));
+    }
+  });
+
   it("validates failure policies before launching a browser", async () => {
     await expect(
       runCapturedScenarioCells([], {
@@ -548,6 +804,24 @@ describe("runCapturedScenarioCells", () => {
         scenarioBaseDirectory,
       }),
     ).rejects.toThrow("failOn.consoleError must be a boolean.");
+  });
+
+  it.each([
+    ["all", "Evidence policy must be an object."],
+    [{ retention: "passing-only" }, "Evidence retention policy is invalid."],
+    [{ masks: [{ id: "private", selector: "main", extra: true }] }, "unsupported fields"],
+    [{ masks: [{ id: "private", selector: "main", routeIds: ["missing"] }] }, "unknown routes"],
+  ])("rejects invalid direct evidence policy inputs before launch", async (evidence, message) => {
+    await expect(
+      runCapturedScenarioCells(captureCells(["ordered"]), {
+        baseURL,
+        evidence: evidence as never,
+        scenarioBaseDirectory,
+      }),
+    ).rejects.toMatchObject({
+      code: "EVIDENCE_POLICY_INVALID",
+      message: expect.stringContaining(message),
+    });
   });
 });
 

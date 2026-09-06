@@ -993,7 +993,7 @@ Synthesized from this review's findings. Execute in order; each item ships throu
   - Surfaced by: D12, D20–D21 and Section 3 — reusable auth must validate origin/cookie scope and never persist UIWitness-owned state.
   - Files: core config schema, runner auth lifecycle/types, CLI validation, security docs/tests.
   - Verify: once-per-run login, fresh cells, origin/domain/path/secure/partition/public-suffix matrix, secret canaries, authenticated-shard rejection.
-- [ ] **T10 (P1, human: ~4 days / Codex: ~6h)** — Runner/Report — Add fail-closed masking and three retention modes
+- [x] **T10 (P1, human: ~4 days / Codex: ~6h)** — Runner/Report — Add fail-closed masking and three retention modes
   - Surfaced by: D13–D14 and Section 11 — privacy selectors must block unsafe capture and omission must be explicit in report schema v2.
   - Files: core evidence config/report-v2 schema, runner capture/persistence, report privacy UI, migration docs/tests.
   - Verify: mask/cardinality/failure-path matrix, no unmasked fallback, all retention semantics, v1/v2 readers, manifest accuracy.

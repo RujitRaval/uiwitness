@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   access,
   chmod,
@@ -20,9 +21,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   canonicalizeJson,
+  EVIDENCE_MANIFEST_PATH,
   expandMatrix,
   parseConfig,
   parseExecutionResult,
+  parseEvidenceManifest,
   parseReport,
   screenshotArtifactPath,
   serializeReport,
@@ -310,6 +313,113 @@ describe("runPersistedScenarioCells", () => {
       ).resolves.toContain("UI State Coverage Report");
     } finally {
       Reflect.deleteProperty(globalThis, eventKey);
+      await project.cleanup();
+    }
+  });
+
+  it("atomically publishes schema-v2 retention outcomes and a privacy-safe manifest", async () => {
+    const project = await temporaryProject();
+    Reflect.set(globalThis, Symbol.for("uiwitness.test.capture-events"), []);
+    try {
+      const cells = persistenceCells(["ordered", "assertion-fail"]);
+      const run = await runPersistedScenarioCells(cells, {
+        baseURL,
+        evidence: {
+          masks: [{ count: 1, id: "private-main", selector: "main" }],
+          retention: "failures-only",
+        },
+        generatedAt: new Date("2026-09-05T12:00:00.000Z"),
+        projectDirectory: project.path,
+        scenarioBaseDirectory,
+      });
+
+      expect(run.report).toMatchObject({
+        evidence: { retention: "failures-only" },
+        schemaVersion: 2,
+      });
+      expect(run.report.executions.map(({ screenshot }) => screenshot)).toEqual([
+        { status: "omitted-by-policy" },
+        {
+          path: screenshotArtifactPath(cells[1]!),
+          status: "captured",
+        },
+      ]);
+      await expectMissing(join(
+        project.path,
+        ...screenshotArtifactPath(cells[0]!).split("/"),
+      ));
+      await expect(access(join(
+        project.path,
+        ...screenshotArtifactPath(cells[1]!).split("/"),
+      ))).resolves.toBeUndefined();
+
+      const manifestSource = await readFile(
+        join(project.path, ...EVIDENCE_MANIFEST_PATH.split("/")),
+        "utf8",
+      );
+      expect(parseEvidenceManifest(manifestSource)).toMatchObject({
+        attempted: 2,
+        captured: 1,
+        masks: [{ cardinalities: [1, 1], id: "private-main" }],
+        omitted: 1,
+        retention: "failures-only",
+      });
+      expect(manifestSource).not.toContain("selector");
+      const html = await readFile(
+        join(project.path, ".uiwitness/report/index.html"),
+        "utf8",
+      );
+      expect(html).toContain("Failures Only retention");
+      expect(html).toContain("Screenshot omitted by retention policy");
+      expect(html).not.toContain("private-main\"");
+
+      const failedCaptureCell = persistenceCells(["screenshot-fail"])[0]!;
+      const failedCapture = await runPersistedScenarioCells([failedCaptureCell], {
+        baseURL,
+        evidence: { retention: "failures-only" },
+        projectDirectory: project.path,
+        scenarioBaseDirectory,
+      });
+      expect(failedCapture.report.executions[0]).toMatchObject({
+        screenshot: { status: "capture-failed" },
+        status: "failed",
+      });
+      expect(parseEvidenceManifest(await readFile(
+        join(project.path, ...EVIDENCE_MANIFEST_PATH.split("/")),
+        "utf8",
+      ))).toMatchObject({
+        attempted: 1,
+        captured: 0,
+        omitted: 1,
+        retention: "failures-only",
+      });
+
+      const none = await runPersistedScenarioCells([cells[0]!], {
+        baseURL,
+        evidence: {
+          masks: [{ id: "never-resolved", selector: "[" }],
+          retention: "none",
+        },
+        projectDirectory: project.path,
+        scenarioBaseDirectory,
+      });
+      expect(none.report.schemaVersion).toBe(2);
+      expect(none.report.executions[0]?.screenshot).toEqual({
+        status: "omitted-by-policy",
+      });
+      expect(await readdir(join(project.path, ".uiwitness/artifacts"))).toEqual([]);
+      expect(parseEvidenceManifest(await readFile(
+        join(project.path, ...EVIDENCE_MANIFEST_PATH.split("/")),
+        "utf8",
+      ))).toMatchObject({
+        attempted: 0,
+        captured: 0,
+        masks: [],
+        omitted: 1,
+        retention: "none",
+      });
+    } finally {
+      Reflect.deleteProperty(globalThis, Symbol.for("uiwitness.test.capture-events"));
       await project.cleanup();
     }
   });
@@ -1120,6 +1230,7 @@ describe("runPersistedScenarioCells", () => {
         "report",
       ]);
       expect((await readdir(reportRoot)).sort()).toEqual([
+        "evidence-manifest.json",
         "index.html",
         "uiwitness.json",
       ]);
@@ -1508,6 +1619,7 @@ describe("runPersistedScenarioCells", () => {
     });
 
     expect(executionArtifactForOutcome(outcome, baseURL)).toEqual({
+      masks: [],
       result: expect.objectContaining({
         diagnostics: {
           consoleErrors: [],
@@ -1524,6 +1636,23 @@ describe("runPersistedScenarioCells", () => {
         url: "https://uiwitness.invalid/capture?source=%5BREDACTED%5D",
       }),
       screenshot: null,
+      screenshotAttempted: false,
+      screenshotStatus: "capture-failed",
+    });
+    expect(executionArtifactForOutcome(
+      outcome,
+      baseURL,
+      { retention: "none" },
+    )).toMatchObject({
+      result: {
+        failures: [
+          { code: "INTERNAL_ERROR", message: "[unprintable thrown value]" },
+        ],
+        status: "failed",
+      },
+      screenshot: null,
+      screenshotAttempted: false,
+      screenshotStatus: "omitted-by-policy",
     });
   });
 
@@ -1687,6 +1816,10 @@ describe("runPersistedScenarioCells", () => {
       const initialScreenshot = await readFile(
         join(project.path, ...initialScreenshotPath.split("/")),
       );
+      const initialEvidenceManifest = await readFile(
+        join(project.path, ...EVIDENCE_MANIFEST_PATH.split("/")),
+        "utf8",
+      );
       const nextCell = persistenceCells(["replacement"])[0]!;
       const nextScreenshotPath = screenshotArtifactPath(nextCell);
       const nextExecution = parseExecutionResult({
@@ -1745,6 +1878,17 @@ describe("runPersistedScenarioCells", () => {
         readFile(join(project.path, ...initialScreenshotPath.split("/"))),
       ).resolves.toEqual(initialScreenshot);
       await expectMissing(join(project.path, ...nextScreenshotPath.split("/")));
+      const restoredEvidenceManifest = await readFile(
+        join(project.path, ...EVIDENCE_MANIFEST_PATH.split("/")),
+        "utf8",
+      );
+      expect(restoredEvidenceManifest).toBe(initialEvidenceManifest);
+      const parsedEvidenceManifest = parseEvidenceManifest(restoredEvidenceManifest);
+      expect(parsedEvidenceManifest.reportDigest).toBe(
+        `sha256:${createHash("sha256")
+          .update(serializeReport(initial.report))
+          .digest("hex")}`,
+      );
       expect(lock.preserve).toBe(false);
     } finally {
       if (lock !== undefined) {

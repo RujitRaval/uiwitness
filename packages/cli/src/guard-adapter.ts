@@ -3,6 +3,8 @@ import { dirname, relative, resolve, sep } from "node:path";
 
 import {
   canonicalJsonDigest,
+  type AnyReportExecutionResult,
+  type AnyUIWitnessReport,
   compareContract,
   type ContractComparisonResult,
   type ContractConfigurationCoordinate,
@@ -13,7 +15,6 @@ import {
   type Sha256Digest,
   type UIWitnessConfig,
   type UIWitnessContract,
-  type UIWitnessReport,
 } from "uiwitness-core";
 
 import {
@@ -60,6 +61,15 @@ function coordinateId(coordinate: {
   readonly viewportId: string;
 }): string {
   return `${coordinate.routeId}/${coordinate.stateId}/${coordinate.viewportId}/${coordinate.theme}`;
+}
+
+function evidenceId(execution: AnyReportExecutionResult): string | null {
+  if ("screenshot" in execution) {
+    return execution.screenshot.status === "captured"
+      ? execution.screenshot.path
+      : null;
+  }
+  return execution.screenshotPath;
 }
 
 function configurationOrder(
@@ -211,12 +221,24 @@ export async function guardConfiguration(
             width: viewport.width,
           };
           const configFingerprint = canonicalJsonDigest(
-            authentication === undefined
+            authentication === undefined && config.evidence === undefined
               ? fingerprintV1
               : {
                   ...fingerprintV1,
-                  authentication,
-                  evidence: { masks: [], retention: "all" },
+                  ...(authentication === undefined ? {} : { authentication }),
+                  evidence: {
+                    masks: [...(config.evidence?.masks ?? [])]
+                      .map((mask) => ({
+                        count: mask.count ?? null,
+                        id: mask.id,
+                        required: mask.required ?? true,
+                        routeIds: [...(mask.routeIds ?? [])].sort(),
+                        selector: mask.selector,
+                        stateIds: [...(mask.stateIds ?? [])].sort(),
+                      }))
+                      .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0),
+                    retention: config.evidence?.retention ?? "all",
+                  },
                   fingerprintVersion: 2,
                 },
           );
@@ -241,7 +263,7 @@ export async function guardConfiguration(
 }
 
 export function contractObservations(
-  report: UIWitnessReport,
+  report: AnyUIWitnessReport,
 ): readonly ContractExecutionObservation[] {
   return Object.freeze(report.executions.map((execution) => Object.freeze({
     failures: Object.freeze(execution.failures.map(({ code }) =>
@@ -256,7 +278,7 @@ export function contractObservations(
 }
 
 export function contractSourceExecutions(
-  report: UIWitnessReport,
+  report: AnyUIWitnessReport,
 ): readonly ContractSourceExecution[] {
   return Object.freeze(report.executions.map((execution) => Object.freeze({
     actual: execution.status === "passed"
@@ -273,7 +295,7 @@ export function contractSourceExecutions(
 
 export function reportIsComplete(
   configuration: readonly ContractConfigurationCoordinate[],
-  report: UIWitnessReport,
+  report: AnyUIWitnessReport,
 ): boolean {
   if (configuration.length !== report.executions.length) {
     return false;
@@ -294,7 +316,7 @@ function lexicalCompare(left: string, right: string): number {
 
 function runProjection(
   configuration: readonly ContractConfigurationCoordinate[],
-  report: UIWitnessReport,
+  report: AnyUIWitnessReport,
 ): JsonValue {
   const configurationById = new Map(
     configuration.map((coordinate) => [coordinate.id, coordinate]),
@@ -313,7 +335,7 @@ function runProjection(
           navigationStatus: execution.diagnostics.navigationStatus,
           pageErrors: sortedStrings(execution.diagnostics.pageErrors),
         },
-        evidenceId: execution.screenshotPath,
+        evidenceId: evidenceId(execution),
         failureCodes: sortedStrings([
           ...new Set(execution.failures.map(({ code }) => code)),
         ]),
@@ -337,7 +359,7 @@ function runProjection(
 /** Hashes the normalized semantic projection of one fresh schema-v1 report. */
 export function guardRunDigest(
   configuration: readonly ContractConfigurationCoordinate[],
-  report: UIWitnessReport,
+  report: AnyUIWitnessReport,
 ): Sha256Digest {
   return canonicalJsonDigest(runProjection(configuration, report));
 }
@@ -470,7 +492,7 @@ export function guardMachineVerdict(
 export function compareGuardInputs(
   contract: UIWitnessContract,
   configuration: readonly ContractConfigurationCoordinate[],
-  report: UIWitnessReport,
+  report: AnyUIWitnessReport,
   evaluatedAt: Date,
 ): ContractComparisonResult {
   return compareContract({

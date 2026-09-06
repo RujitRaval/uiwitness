@@ -68,6 +68,7 @@ describe("uiwitness-runner-playwright package boundary", () => {
       "discoverPublicRoutes",
       "PublicRouteDiscoveryError",
       "runExecutionCells",
+      "EvidencePolicyError",
       "runCapturedScenarioCells",
       "ScenarioCaptureError",
       "runPersistedScenarioCells",

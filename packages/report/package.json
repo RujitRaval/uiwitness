@@ -1,6 +1,6 @@
 {
   "name": "uiwitness-report",
-  "version": "0.26.8",
+  "version": "0.26.9",
   "description": "Deterministic report transformation and offline HTML generation for UIWitness.",
   "license": "MIT",
   "repository": {

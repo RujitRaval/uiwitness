@@ -21,6 +21,8 @@ No SaaS, accounts, cloud storage, billing, LLM requirement, automatic route/stat
 ## Approved roadmap exception
 The Public URL Quick Check adds bounded, navigation-only route discovery for authorized public sites. It checks one `public` state across a fixed mobile/desktop by light/dark matrix and does not infer application states or replace explicit configured scans. Discovery, persisted evidence, `uiwitness check <url>` orchestration, overwrite-safe `--write-config` promotion, public launch guidance, and the registry-only check → promotion → scan → open consumer release gate are implemented.
 
+The approved State Contract Guard roadmap adds versioned UI promises without a hosted backend. T1–T10 are complete, including deterministic contract comparison, explicit exception governance, atomic local generations, the pinned GitHub Action, memory-only authentication, and fail-closed screenshot masks with explicit retention. Sharding and aggregation remain later approved slices.
+
 ## Success
 A new developer can install, configure a few states, run one command, and understand a visually obvious UI problem from the report without author assistance. The report is strong enough to be the primary README/launch asset.
 

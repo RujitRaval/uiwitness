@@ -40,9 +40,11 @@ uiwitness scan --coordinate dashboard/success/desktop/light --headed
 uiwitness scan --headed
 ```
 
-`--route` matches one configured route ID exactly and rejects an unknown ID before creating output. `--coordinate` is the atomic `route/state/viewport/theme` selector used by guard reproduction commands; it must resolve to exactly one configured cell and cannot be combined with `--route`. Scenario paths resolve from the selected config's directory, while `.uiwitness/` belongs to the invocation working directory. The summary groups executions by route, reports pass/fail status and coverage from schema-v1 metadata, and prints `.uiwitness/report/index.html`. Each completed scan writes deterministic PNGs, schema-v1 JSON, and the offline HTML report.
+`--route` matches one configured route ID exactly and rejects an unknown ID before creating output. `--coordinate` is the atomic `route/state/viewport/theme` selector used by guard reproduction commands; it must resolve to exactly one configured cell and cannot be combined with `--route`. Scenario paths resolve from the selected config's directory, while `.uiwitness/` belongs to the invocation working directory. The summary groups executions by route and prints `.uiwitness/report/index.html`. Default `all` retention writes schema-v1 JSON; non-default privacy policies write schema v2 with explicit screenshot outcomes.
 
 Private applications may declare one `authentication` block with a trusted local `setup` module and the optional `shared-readonly` mode. The module runs once per complete scan, reads its own environment or secret-manager inputs, and returns no state. UIWitness validates Playwright's memory-only storage state and deep-copies it into every otherwise-fresh cell context. The setup file must stay beneath the invocation workspace through regular, non-linked boundaries. Origin or cookie scope violations and opaque setup failures exit `2` before any product cell is created.
+
+`evidence.retention` is `all` (default), `failures-only`, or `none`. `evidence.masks` declares non-secret IDs and CSS selectors with optional exact `routeIds`, `stateIds`, `count`, and `required` (default `true`). Applicable masks bind to the exact resolved nodes before capture; post-capture identity/cardinality drift or any other unsafe resolution/application failure discards bytes and blocks the cell without unmasked fallback. `none` performs no selector lookup. Every completed run writes a selector-free evidence manifest beside the report.
 
 ```ts
 authentication: {

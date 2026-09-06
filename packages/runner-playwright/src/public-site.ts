@@ -142,7 +142,7 @@ export async function runPublicSiteChecks(
     options.readinessTimeoutMs === undefined
       ? undefined
       : { timeoutMs: options.readinessTimeoutMs };
-  const persistenceOptions: RunPersistedScenarioCellsOptions = {
+  const persistenceOptions: Omit<RunPersistedScenarioCellsOptions, "evidence"> = {
     baseURL: discovery.baseURL,
     failOn: PUBLIC_SITE_CHECK_CONTRACT.failOn,
     ...(options.generatedAt === undefined

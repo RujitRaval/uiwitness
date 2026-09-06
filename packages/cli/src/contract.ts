@@ -20,7 +20,7 @@ import {
   parseContractProposalMetadata,
   parseContractProposalSource,
   parseCommittedGeneration,
-  parseGenerationManifest,
+  parseAnyGenerationManifest,
   generationManifestDigest,
   serializeContractProposal,
   serializeContractProposalMetadata,
@@ -257,7 +257,7 @@ async function verifyCommittedGeneration(bundle: ProposalBundle): Promise<void> 
     "GUARD_PROPOSAL_INVALID",
     "Committed generation manifest",
   );
-  const manifest = parseGenerationManifest(await readFile(manifestPath, "utf8"));
+  const manifest = parseAnyGenerationManifest(await readFile(manifestPath, "utf8"));
   if (
     generationManifestDigest(manifest) !== marker.manifestDigest ||
     JSON.stringify(manifest.sourceGenerationDigests) !==

@@ -18,8 +18,11 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import {
   COMMITTED_GENERATION_SCHEMA_VERSION,
-  GENERATION_MANIFEST_SCHEMA_VERSION,
+  EVIDENCE_MANIFEST_PATH,
+  EVIDENCE_MANIFEST_SCHEMA_VERSION,
+  PRIVACY_GENERATION_MANIFEST_SCHEMA_VERSION,
   REPORT_SCHEMA_VERSION,
+  PRIVACY_REPORT_SCHEMA_VERSION,
   calculateCoverage,
   canonicalizeJson,
   contractProposalDigest,
@@ -31,22 +34,29 @@ import {
   parseContractProposalMetadata,
   parseContractProposalSource,
   parseExecutionResult,
-  parseGenerationManifest,
+  parseAnyGenerationManifest,
+  parsePrivacyGenerationManifest,
+  parseAnyReport,
   parseReport,
   screenshotArtifactPath,
   serializeCommittedGeneration,
   serializeContractProposal,
   serializeContractProposalMetadata,
   serializeContractProposalSource,
-  serializeGenerationManifest,
+  serializePrivacyGenerationManifest,
+  serializeEvidenceManifest,
   serializeReport,
-  type GenerationArtifactDescriptor,
+  type PrivacyGenerationArtifactDescriptor,
   type GenerationArtifactRole,
+  type PrivacyGenerationArtifactRole,
   type ExecutionDiagnostics,
   type ExecutionFailure,
   type ExecutionResult,
   type MatrixCell,
   type JsonValue,
+  type AnyUIWitnessReport,
+  type EvidenceConfig,
+  type UIWitnessEvidenceManifest,
   type UIWitnessReport,
   type UIWitnessCommittedGeneration,
   type Sha256Digest,
@@ -61,7 +71,8 @@ import {
   diagnosticErrorMessage,
   runCapturedScenarioCells,
   ScenarioCaptureError,
-  type CapturedScenarioCell,
+  type CompletedScenarioCell,
+  type PrivacyRunCapturedScenarioCellsOptions,
   type RunCapturedScenarioCellsOptions,
   type ScenarioCaptureEvidence,
 } from "./capture.js";
@@ -89,6 +100,7 @@ const privateFileMode = 0o600;
 /** Filesystem and capture settings for one complete programmatic runner pass. */
 export interface RunPersistedScenarioCellsOptions
   extends RunCapturedScenarioCellsOptions {
+  readonly evidence?: (EvidenceConfig & { readonly retention?: "all" }) | undefined;
   /** Optional deterministic report timestamp. Defaults to the completion time. */
   readonly generatedAt?: Date | undefined;
   /** Existing project directory that owns the generated `.uiwitness/` tree. */
@@ -96,6 +108,22 @@ export interface RunPersistedScenarioCellsOptions
   /** Adds validated browser-neutral outputs before the runner commits a generation. */
   readonly finalizeGeneration?: GenerationFinalizer | undefined;
 }
+
+export interface PrivacyRunPersistedScenarioCellsOptions
+  extends Omit<RunPersistedScenarioCellsOptions, "evidence" | "finalizeGeneration"> {
+  readonly evidence: EvidenceConfig & {
+    readonly retention: "failures-only" | "none";
+  };
+  readonly finalizeGeneration?: PrivacyGenerationFinalizer | undefined;
+}
+
+type AnyRunPersistedScenarioCellsOptions = Omit<
+  RunPersistedScenarioCellsOptions,
+  "evidence" | "finalizeGeneration"
+> & {
+  readonly evidence?: EvidenceConfig | undefined;
+  readonly finalizeGeneration?: GenerationFinalizer | PrivacyGenerationFinalizer | undefined;
+};
 
 /** The validated report and its stable project-relative JSON and HTML locations. */
 export interface PersistedScenarioRun {
@@ -105,6 +133,15 @@ export interface PersistedScenarioRun {
   readonly reportPath: typeof reportProjectPath;
 }
 
+export interface PrivacyPersistedScenarioRun
+  extends Omit<PersistedScenarioRun, "report"> {
+  readonly report: Extract<AnyUIWitnessReport, { readonly schemaVersion: 2 }>;
+}
+
+export type AnyPersistedScenarioRun =
+  | PersistedScenarioRun
+  | PrivacyPersistedScenarioRun;
+
 export type GenerationArtifactPublication = "exclusive" | "immutable" | "replace";
 
 export interface GenerationSidecarArtifact {
@@ -112,7 +149,10 @@ export interface GenerationSidecarArtifact {
   readonly mutable?: boolean | undefined;
   readonly path: string;
   readonly publication: GenerationArtifactPublication;
-  readonly role: Exclude<GenerationArtifactRole, "evidence" | "report-html" | "report-json">;
+  readonly role: Exclude<
+    GenerationArtifactRole,
+    "evidence" | "evidence-manifest" | "report-html" | "report-json"
+  >;
 }
 
 export interface GenerationFinalization {
@@ -126,9 +166,17 @@ export type GenerationFinalizer = (
   report: UIWitnessReport,
 ) => GenerationFinalization | Promise<GenerationFinalization>;
 
+/** Finalizes a privacy-report generation after retention changes the report schema. */
+export type PrivacyGenerationFinalizer = (
+  report: Extract<AnyUIWitnessReport, { readonly schemaVersion: 2 }>,
+) => GenerationFinalization | Promise<GenerationFinalization>;
+
 interface ExecutionArtifact {
+  readonly masks?: ScenarioCaptureEvidence["masks"];
   readonly result: ExecutionResult;
   readonly screenshot: Uint8Array | null;
+  readonly screenshotAttempted?: boolean;
+  readonly screenshotStatus?: ScenarioCaptureEvidence["screenshotStatus"];
 }
 
 interface PublicationOperations {
@@ -217,11 +265,12 @@ function resultInput(
   cell: MatrixCell,
   baseURL: string,
   status: "failed" | "passed",
-  evidence: ScenarioCaptureEvidence | CapturedScenarioCell | null,
+  evidence: ScenarioCaptureEvidence | CompletedScenarioCell | null,
   failures: readonly ExecutionFailure[],
 ): ExecutionResult {
   const screenshotPath =
-    evidence?.screenshot === null || evidence === null
+    evidence === null ||
+      (evidence.screenshot === null && evidence.screenshotStatus !== "omitted-by-policy")
       ? null
       : screenshotArtifactPath(cell);
   return parseExecutionResult({
@@ -243,18 +292,26 @@ function resultInput(
 
 /** @internal Translates one settled capture into its core result and PNG bytes. */
 export function executionArtifactForOutcome(
-  outcome: CellExecutionOutcome<CapturedScenarioCell>,
+  outcome: CellExecutionOutcome<CompletedScenarioCell>,
   baseURL: string,
+  evidence?: EvidenceConfig | undefined,
 ): ExecutionArtifact {
+  const fallbackScreenshotStatus = evidence?.retention === "none"
+    ? "omitted-by-policy"
+    : "capture-failed";
   if (outcome.status === "fulfilled") {
     return Object.freeze({
+      masks: outcome.value.masks,
       result: resultInput(outcome.cell, baseURL, "passed", outcome.value, []),
       screenshot: outcome.value.screenshot,
+      screenshotAttempted: outcome.value.screenshotAttempted,
+      screenshotStatus: outcome.value.screenshotStatus,
     });
   }
 
   if (outcome.reason instanceof ScenarioCaptureError) {
     return Object.freeze({
+      masks: outcome.reason.evidence.masks,
       result: resultInput(
         outcome.cell,
         baseURL,
@@ -263,11 +320,14 @@ export function executionArtifactForOutcome(
         outcome.reason.failures,
       ),
       screenshot: outcome.reason.evidence.screenshot,
+      screenshotAttempted: outcome.reason.evidence.screenshotAttempted,
+      screenshotStatus: outcome.reason.evidence.screenshotStatus,
     });
   }
 
   if (outcome.reason instanceof DocumentNavigationError) {
     return Object.freeze({
+      masks: Object.freeze([]),
       result: resultInput(outcome.cell, baseURL, "failed", null, [
         Object.freeze({
           code: "NAVIGATION_FAILED",
@@ -275,10 +335,13 @@ export function executionArtifactForOutcome(
         }),
       ]),
       screenshot: null,
+      screenshotAttempted: false,
+      screenshotStatus: fallbackScreenshotStatus,
     });
   }
 
   return Object.freeze({
+    masks: Object.freeze([]),
     result: resultInput(outcome.cell, baseURL, "failed", null, [
       Object.freeze({
         code: "INTERNAL_ERROR",
@@ -286,6 +349,8 @@ export function executionArtifactForOutcome(
       }),
     ]),
     screenshot: null,
+    screenshotAttempted: false,
+    screenshotStatus: fallbackScreenshotStatus,
   });
 }
 
@@ -294,39 +359,62 @@ function reportFor(
   artifacts: readonly ExecutionArtifact[],
   baseURL: string,
   generatedAt: string,
-): UIWitnessReport {
+  evidence: EvidenceConfig | undefined,
+): AnyUIWitnessReport {
   const executions = artifacts.map(({ result }) => result);
   const passed = executions.filter(({ status }) => status === "passed").length;
-  return parseReport({
-    executions,
+  const summary = {
+    coverage: calculateCoverage(
+      cells,
+      executions.map((execution) => ({
+        passed: execution.status === "passed",
+        routeId: execution.routeId,
+        stateId: execution.stateId,
+        theme: execution.theme,
+        viewportId: execution.viewportId,
+      })),
+    ),
+    durationMs: executions.reduce(
+      (total, execution) => total + execution.durationMs,
+      0,
+    ),
+    executions: executions.length,
+    failed: executions.length - passed,
+    passed,
+    routes: new Set(executions.map(({ routeId }) => routeId)).size,
+    states: new Set(
+      executions.map(({ routeId, stateId }) =>
+        JSON.stringify([routeId, stateId]),
+      ),
+    ).size,
+  };
+  const retention = evidence?.retention ?? "all";
+  if (retention === "all") {
+    return parseReport({
+      executions,
+      generatedAt,
+      project: { baseURL },
+      schemaVersion: REPORT_SCHEMA_VERSION,
+      summary,
+    });
+  }
+  return parseAnyReport({
+    evidence: { retention },
+    executions: artifacts.map(({ result, screenshot, screenshotStatus }) => {
+      const { screenshotPath, ...common } = result;
+      const resolvedStatus = screenshotStatus ??
+        (screenshot === null ? "capture-failed" : "captured");
+      return {
+        ...common,
+        screenshot: resolvedStatus === "captured" && screenshotPath !== null
+          ? { path: screenshotPath, status: "captured" as const }
+          : { status: resolvedStatus as "capture-failed" | "omitted-by-policy" },
+      };
+    }),
     generatedAt,
     project: { baseURL },
-    schemaVersion: REPORT_SCHEMA_VERSION,
-    summary: {
-      coverage: calculateCoverage(
-        cells,
-        executions.map((execution) => ({
-          passed: execution.status === "passed",
-          routeId: execution.routeId,
-          stateId: execution.stateId,
-          theme: execution.theme,
-          viewportId: execution.viewportId,
-        })),
-      ),
-      durationMs: executions.reduce(
-        (total, execution) => total + execution.durationMs,
-        0,
-      ),
-      executions: executions.length,
-      failed: executions.length - passed,
-      passed,
-      routes: new Set(executions.map(({ routeId }) => routeId)).size,
-      states: new Set(
-        executions.map(({ routeId, stateId }) =>
-          JSON.stringify([routeId, stateId]),
-        ),
-      ).size,
-    },
+    schemaVersion: PRIVACY_REPORT_SCHEMA_VERSION,
+    summary,
   });
 }
 
@@ -341,6 +429,7 @@ function validatePersistenceBoundary(
   cells: readonly MatrixCell[],
   baseURL: string,
   generatedAt: string | undefined,
+  evidence: EvidenceConfig | undefined,
 ): void {
   const artifacts = cells.map((cell) =>
     Object.freeze({
@@ -360,6 +449,11 @@ function validatePersistenceBoundary(
       viewportId: cell.viewportId,
       }),
       screenshot: null,
+      masks: Object.freeze([]),
+      screenshotAttempted: evidence?.retention !== "none",
+      screenshotStatus: evidence?.retention === undefined || evidence.retention === "all"
+        ? "captured"
+        : "omitted-by-policy",
     }),
   );
   reportFor(
@@ -367,6 +461,7 @@ function validatePersistenceBoundary(
     artifacts,
     baseURL,
     generatedAt ?? "1970-01-01T00:00:00.000Z",
+    evidence,
   );
 }
 
@@ -459,6 +554,7 @@ function isGenerationManifestPath(projectPath: string): boolean {
 function assertSafeJournalPath(projectPath: string): void {
   if (
     projectPath === generationPointerProjectPath ||
+    projectPath === EVIDENCE_MANIFEST_PATH ||
     isGenerationManifestPath(projectPath)
   ) {
     return;
@@ -523,6 +619,46 @@ function artifactDigest(contents: string | Uint8Array): Sha256Digest {
   return `sha256:${digest}`;
 }
 
+function evidenceManifestFor(
+  report: AnyUIWitnessReport,
+  reportContents: string,
+  artifacts: readonly ExecutionArtifact[],
+  finalization: GenerationFinalization,
+): UIWitnessEvidenceManifest {
+  const cardinalities = new Map<string, number[]>();
+  for (const artifact of artifacts) {
+    for (const mask of artifact.masks ?? []) {
+      const values = cardinalities.get(mask.id) ?? [];
+      values.push(mask.count);
+      cardinalities.set(mask.id, values);
+    }
+  }
+  const reportDigest = artifactDigest(reportContents);
+  const verdict = finalization.artifacts?.find(
+    ({ role }) => role === "contract-verdict",
+  );
+  return Object.freeze({
+    attempted: artifacts.filter((artifact) =>
+      artifact.screenshotAttempted ?? artifact.screenshot !== null
+    ).length,
+    captured: artifacts.filter(({ screenshot }) => screenshot !== null).length,
+    generationDigest: finalization.runDigest ?? reportDigest,
+    masks: Object.freeze([...cardinalities]
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .map(([id, values]) => Object.freeze({
+        cardinalities: Object.freeze([...values].sort((left, right) => left - right)),
+        id,
+      }))),
+    omitted: artifacts.filter(({ screenshot }) => screenshot === null).length,
+    reportDigest,
+    retention: report.schemaVersion === REPORT_SCHEMA_VERSION
+      ? "all"
+      : report.evidence?.retention ?? "all",
+    schemaVersion: EVIDENCE_MANIFEST_SCHEMA_VERSION,
+    verdictDigest: verdict === undefined ? null : artifactDigest(verdict.contents),
+  });
+}
+
 function posixProjectPath(root: string, destination: string): string {
   const local = relative(root, destination);
   if (
@@ -576,10 +712,10 @@ async function syncDirectoryTree(
 
 function artifactDescriptor(
   path: string,
-  role: GenerationArtifactRole,
+  role: PrivacyGenerationArtifactRole,
   contents: string | Uint8Array,
   mutable = false,
-): GenerationArtifactDescriptor {
+): PrivacyGenerationArtifactDescriptor {
   return Object.freeze({
     bytes: typeof contents === "string" ? Buffer.byteLength(contents) : contents.byteLength,
     digest: artifactDigest(contents),
@@ -615,6 +751,15 @@ function validateCanonicalJsonSidecar(artifact: GenerationSidecarArtifact): stri
 
 function validateGenerationSidecars(finalization: GenerationFinalization): void {
   const artifacts = finalization.artifacts ?? [];
+  const runnerOwnedRoles = new Set<PrivacyGenerationArtifactRole>([
+    "evidence",
+    "evidence-manifest",
+    "report-html",
+    "report-json",
+  ]);
+  if (artifacts.some(({ role }) => runnerOwnedRoles.has(role))) {
+    throw new TypeError("Generation sidecars cannot use runner-owned artifact roles.");
+  }
   const verdicts = artifacts.filter(({ role }) => role === "contract-verdict");
   const copies = artifacts.filter(({ role }) => role === "json-copy");
   if (verdicts.length > 1 || copies.length > 1) {
@@ -1190,7 +1335,7 @@ async function validatePublishedMarker(
   const marker = parseCommittedGeneration(markerBytes.toString("utf8"));
   const manifestPath = resolve(root, ...canonicalRelativeSegments(marker.manifestPath));
   const manifestBytes = await readFile(manifestPath);
-  const manifest = parseGenerationManifest(manifestBytes.toString("utf8"));
+  const manifest = parseAnyGenerationManifest(manifestBytes.toString("utf8"));
   if (
     generationManifestDigest(manifest) !== marker.manifestDigest ||
     JSON.stringify(manifest.sourceGenerationDigests) !==
@@ -1429,7 +1574,7 @@ export async function acquirePersistenceLock(
 export async function persistReport(
   root: string,
   lock: PersistenceLock,
-  report: UIWitnessReport,
+  report: AnyUIWitnessReport,
   artifacts: readonly ExecutionArtifact[],
   operations: PublicationOperations = publicationOperations,
   finalization?: GenerationFinalization | undefined,
@@ -1521,9 +1666,19 @@ export async function persistReport(
       );
     }
     const reportContents = serializeReport(report);
+    const evidenceManifest = evidenceManifestFor(
+      report,
+      reportContents,
+      artifacts,
+      selectedFinalization,
+    );
+    const evidenceManifestContents = serializeEvidenceManifest(evidenceManifest);
     const htmlContents = renderReportHtml(
       report,
-      contractVerdict === undefined ? {} : { contractVerdict },
+      {
+        ...(contractVerdict === undefined ? {} : { contractVerdict }),
+        evidenceManifest,
+      },
     );
     const stagedReport = join(stagingRoot, reportFileName);
     assertContained(stagingRoot, stagedReport);
@@ -1540,7 +1695,7 @@ export async function persistReport(
       readonly mutable: boolean;
       readonly path: string;
       readonly publication: GenerationArtifactPublication;
-      readonly role: GenerationArtifactRole;
+      readonly role: PrivacyGenerationArtifactRole;
       readonly staged: string;
     }> = [];
     for (const [index, sidecar] of sidecars.entries()) {
@@ -1589,7 +1744,29 @@ export async function persistReport(
       });
     }
 
-    const descriptors: GenerationArtifactDescriptor[] = artifacts
+    const evidenceManifestFinal = resolve(
+      root,
+      ...EVIDENCE_MANIFEST_PATH.split("/"),
+    );
+    const stagedEvidenceManifest = join(
+      stagingRoot,
+      `sidecar-${String(sidecars.length).padStart(5, "0")}`,
+    );
+    await (operations.writeFile ?? writePrivateFile)(
+      stagedEvidenceManifest,
+      evidenceManifestContents,
+    );
+    stagedAdditional.push({
+      contents: evidenceManifestContents,
+      final: evidenceManifestFinal,
+      mutable: false,
+      path: EVIDENCE_MANIFEST_PATH,
+      publication: "replace",
+      role: "evidence-manifest",
+      staged: stagedEvidenceManifest,
+    });
+
+    const descriptors: PrivacyGenerationArtifactDescriptor[] = artifacts
       .filter((artifact) => artifact.screenshot !== null && artifact.result.screenshotPath !== null)
       .map((artifact) => artifactDescriptor(
         artifact.result.screenshotPath!,
@@ -1607,16 +1784,16 @@ export async function persistReport(
     const sourceGenerationDigests = [
       ...new Set(selectedFinalization.sourceGenerationDigests ?? []),
     ].sort();
-    const manifest = parseGenerationManifest(serializeGenerationManifest({
+    const manifest = parsePrivacyGenerationManifest(serializePrivacyGenerationManifest({
       artifacts: descriptors,
       complete: true,
       reportDigest: artifactDigest(reportContents),
       runDigest: selectedFinalization.runDigest ?? null,
-      schemaVersion: GENERATION_MANIFEST_SCHEMA_VERSION,
+      schemaVersion: PRIVACY_GENERATION_MANIFEST_SCHEMA_VERSION,
       sourceGenerationDigests,
       toolVersion: selectedFinalization.toolVersion,
     }));
-    const manifestContents = serializeGenerationManifest(manifest);
+    const manifestContents = serializePrivacyGenerationManifest(manifest);
     const manifestDigest = generationManifestDigest(manifest);
     const manifestPath = `${evidenceDirectoryName}/generations/${manifestDigest.slice("sha256:".length)}.manifest.json`;
     const manifestFinal = resolve(root, ...manifestPath.split("/"));
@@ -1875,30 +2052,59 @@ export async function persistReport(
  * Runs the complete browser lifecycle and transactionally publishes deterministic
  * PNGs, schema-v1 JSON, and the offline HTML report under one owned run lock.
  */
-export async function runPersistedScenarioCells(
+export function runPersistedScenarioCells(
+  cells: readonly MatrixCell[],
+  options: PrivacyRunPersistedScenarioCellsOptions,
+): Promise<PrivacyPersistedScenarioRun>;
+export function runPersistedScenarioCells(
   cells: readonly MatrixCell[],
   options: RunPersistedScenarioCellsOptions,
-): Promise<PersistedScenarioRun> {
+): Promise<PersistedScenarioRun>;
+export function runPersistedScenarioCells(
+  cells: readonly MatrixCell[],
+  options: AnyRunPersistedScenarioCellsOptions,
+): Promise<AnyPersistedScenarioRun>;
+export async function runPersistedScenarioCells(
+  cells: readonly MatrixCell[],
+  options: AnyRunPersistedScenarioCellsOptions,
+): Promise<AnyPersistedScenarioRun> {
   const root = await projectRoot(options.projectDirectory);
   const configuredTimestamp = reportTimestamp(options.generatedAt);
-  validatePersistenceBoundary(cells, options.baseURL, configuredTimestamp);
+  validatePersistenceBoundary(
+    cells,
+    options.baseURL,
+    configuredTimestamp,
+    options.evidence,
+  );
   const lock = await acquirePersistenceLock(root);
-  let run: PersistedScenarioRun | undefined;
+  let run: AnyPersistedScenarioRun | undefined;
   let runError: unknown;
   try {
-    const outcomes = await runCapturedScenarioCells(cells, options);
+    const outcomes = options.evidence?.retention === "failures-only" ||
+        options.evidence?.retention === "none"
+      ? await runCapturedScenarioCells(
+          cells,
+          options as PrivacyRunCapturedScenarioCellsOptions,
+        )
+      : await runCapturedScenarioCells(
+          cells,
+          options as RunCapturedScenarioCellsOptions,
+        );
     const artifacts = outcomes.map((outcome) =>
-      executionArtifactForOutcome(outcome, options.baseURL),
+      executionArtifactForOutcome(outcome, options.baseURL, options.evidence),
     );
     const report = reportFor(
       cells,
       artifacts,
       options.baseURL,
       configuredTimestamp ?? new Date().toISOString(),
+      options.evidence,
     );
     const finalization = options.finalizeGeneration === undefined
       ? undefined
-      : await options.finalizeGeneration(report);
+      : report.schemaVersion === REPORT_SCHEMA_VERSION
+        ? await (options.finalizeGeneration as GenerationFinalizer)(report)
+        : await (options.finalizeGeneration as PrivacyGenerationFinalizer)(report);
     const generation = await persistReport(
       root,
       lock,
@@ -1912,7 +2118,7 @@ export async function runPersistedScenarioCells(
       htmlReportPath: REPORT_HTML_PATH,
       report,
       reportPath: reportProjectPath,
-    });
+    }) as AnyPersistedScenarioRun;
   } catch (error: unknown) {
     runError = error;
   }

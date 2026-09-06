@@ -3,10 +3,10 @@ import { dirname, resolve } from "node:path";
 
 import {
   expandMatrix,
+  type AnyUIWitnessReport,
   type GenerationArtifactRole,
   type Sha256Digest,
   type UIWitnessCommittedGeneration,
-  type UIWitnessReport,
 } from "uiwitness-core";
 
 import { loadConfig } from "./config.js";
@@ -18,7 +18,7 @@ interface ScanGenerationFinalization {
     readonly mutable?: boolean | undefined;
     readonly path: string;
     readonly publication: "exclusive" | "immutable" | "replace";
-    readonly role: Exclude<GenerationArtifactRole, "evidence" | "report-html" | "report-json">;
+    readonly role: Exclude<GenerationArtifactRole, "evidence" | "evidence-manifest" | "report-html" | "report-json">;
   }[] | undefined;
   readonly runDigest?: Sha256Digest | undefined;
   readonly sourceGenerationDigests?: readonly Sha256Digest[] | undefined;
@@ -26,7 +26,7 @@ interface ScanGenerationFinalization {
 }
 
 type ScanGenerationFinalizer = (
-  report: UIWitnessReport,
+  report: AnyUIWitnessReport,
 ) => ScanGenerationFinalization | Promise<ScanGenerationFinalization>;
 
 /** Stable categories for expected scan-orchestration failures. */
@@ -70,7 +70,7 @@ export interface ScanResult {
   readonly configPath: string;
   readonly generation: UIWitnessCommittedGeneration;
   readonly htmlReportPath: ".uiwitness/report/index.html";
-  readonly report: UIWitnessReport;
+  readonly report: AnyUIWitnessReport;
   readonly reportPath: ".uiwitness/report/uiwitness.json";
 }
 
@@ -194,6 +194,9 @@ export async function scanLoadedProject(
             },
           }),
       baseURL: loaded.config.baseURL,
+      ...(loaded.config.evidence === undefined
+        ? {}
+        : { evidence: loaded.config.evidence }),
       ...(loaded.config.failOn === undefined
         ? {}
         : { failOn: loaded.config.failOn }),

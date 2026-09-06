@@ -15,13 +15,15 @@ npx uiwitness --version
 
 `check <url>` needs no UIWitness config. It discovers at most five same-origin HTML pages by default, checks each at mobile/desktop × light/dark, and writes screenshots, schema-v1 JSON, and the kinetic offline report beneath `.uiwitness/`. Use `--max-pages <1-20>` to change the bounded discovery budget or `--headed` to watch Chromium. Add `--write-config` to save an overwrite-safe `uiwitness.config.mts` and `uiwitness/scenarios/public/default.mts`; the untouched result runs through `npx uiwitness scan`. Run it only against websites you own or are authorized to test.
 
-New `check`, `scan`, and `open` operations use `.uiwitness/report/uiwitness.json` and `.uiwitness/report/index.html`. They never rename, copy, delete, or inspect a pre-existing `.statecraft/` evidence tree. The schema remains version 1, and programmatic report readers continue to accept legacy `.statecraft/artifacts/**` screenshot references without rewriting them.
+New `check`, `scan`, and `open` operations use `.uiwitness/report/uiwitness.json` and `.uiwitness/report/index.html`. They never rename, copy, delete, or inspect a pre-existing `.statecraft/` evidence tree. Quick Check and configured runs using default `all` retention emit schema v1; configured `failures-only` or `none` runs emit schema v2. Version-aware readers accept both versions, while the schema-v1 reader continues to accept legacy `.statecraft/artifacts/**` screenshot references without rewriting them.
 
 `init` generates `uiwitness.config.mts` and `uiwitness/scenarios/home/success.mts`, so the starter works without changing npm's default package type.
 
 `guard` executes the complete configured matrix and compares that fresh result with `uiwitness.contract.json`. It commits the deterministic `.uiwitness/contract-verdict.json` together with report/evidence, any proposal family, a content-addressed manifest, and the stable `.uiwitness/generation.json` marker. It exits `0` for a match, `1` for contract failures or unaccepted drift, and `2` when the run cannot prove the contract. Regressions include an exact headed `scan --coordinate route/state/viewport/theme` command. Config, contract, scenario, and explicit `--json` paths are restricted to real non-symbolic-link paths beneath the invocation directory.
 
 Configured `scan` and `guard` runs can use one trusted `authentication` setup module for a non-mutating shared account. Login runs once, validated storage state stays in memory, and every product-state cell still receives a fresh browser context. Exact extra origin and cookie scopes must be declared; stored auth files, multiple roles, authenticated sharding, and secret-bearing fork runs are not supported.
+
+Configured runs can also declare fail-closed evidence masks plus `all`, `failures-only`, or `none` screenshot retention. Default `all` keeps schema-v1 compatibility; the privacy policies use schema v2 so intentional omission cannot be confused with capture failure.
 
 `--version` prints the exact installed package version without project discovery. The official full-SHA-pinned GitHub Action uses it to reject Action/package drift before launching Chromium.
 

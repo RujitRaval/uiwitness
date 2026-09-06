@@ -8,6 +8,7 @@ import {
   type ContractRunErrorReason,
   type ContractVerdictStatus,
   type ExecutionFailureCode,
+  type UIWitnessEvidenceManifest,
 } from "uiwitness-core";
 
 const digestPattern = /^sha256:[0-9a-f]{64}$/;
@@ -21,6 +22,10 @@ const executionFailureCodes = new Set<ExecutionFailureCode>([
   "CONSOLE_ERROR",
   "FAILED_REQUEST",
   "INTERNAL_ERROR",
+  "MASK_APPLY_FAILED",
+  "MASK_CARDINALITY_MISMATCH",
+  "MASK_REQUIRED_MISSING",
+  "MASK_SELECTOR_INVALID",
   "NAVIGATION_FAILED",
   "PAGE_ERROR",
   "SCREENSHOT_FAILED",
@@ -60,6 +65,7 @@ export interface ContractVerdictReportInput {
 /** Additive renderer options. Omitting them preserves the execution-only report. */
 export interface RenderReportOptions {
   readonly contractVerdict?: ContractVerdictReportInput | undefined;
+  readonly evidenceManifest?: UIWitnessEvidenceManifest | undefined;
 }
 
 export interface ContractFindingView {

@@ -18,10 +18,14 @@ function crossOriginUrl(pathname) {
 }
 
 function pageMarkup(stateId) {
+  const hidden = stateId === "hidden-mask"
+    ? '<aside hidden data-private="true">secret</aside>'
+    : "";
   return `<!doctype html>
     <html>
       <body style="margin: 0; min-height: 1200px">
         <main data-state="${stateId}">${stateId}</main>
+        ${hidden}
       </body>
     </html>`;
 }
@@ -113,11 +117,80 @@ export default {
         throw new Error("screenshot failed token=visible");
       };
     }
+    if (state.id === "mask-apply-fail") {
+      page.screenshot = async (options) => {
+        record(`masked-screenshot:${options?.maskColor}:${options?.mask?.length ?? 0}`);
+        throw new Error("masked screenshot failed token=visible");
+      };
+    }
     if (state.id === "ordered") {
       const screenshot = page.screenshot.bind(page);
       page.screenshot = async (options) => {
         record("screenshot");
         return screenshot(options);
+      };
+    }
+    if (state.id === "hidden-mask") {
+      const screenshot = page.screenshot.bind(page);
+      page.screenshot = async (options) => {
+        record(`hidden-masked-screenshot:${options?.maskColor}:${options?.mask?.length ?? 0}`);
+        return screenshot(options);
+      };
+    }
+    if (state.id === "mask-dom-churn") {
+      const screenshot = page.screenshot.bind(page);
+      page.screenshot = async (options) => {
+        await page.evaluate(() => globalThis.document.querySelector("main")?.remove());
+        return screenshot(options);
+      };
+    }
+    if (state.id === "mask-dom-addition") {
+      const screenshot = page.screenshot.bind(page);
+      page.screenshot = async (options) => {
+        await page.evaluate(() => {
+          const added = globalThis.document.createElement("main");
+          added.textContent = "new private content";
+          globalThis.document.body.append(added);
+        });
+        return screenshot(options);
+      };
+    }
+    if (state.id === "mask-dom-transient-addition") {
+      const screenshot = page.screenshot.bind(page);
+      page.screenshot = async (options) => {
+        await page.evaluate(() => {
+          const added = globalThis.document.createElement("main");
+          added.dataset.transientPrivate = "true";
+          added.textContent = "transient private content";
+          globalThis.document.body.append(added);
+        });
+        record(`transient-masked-screenshot:${options?.mask?.length ?? 0}`);
+        try {
+          return await screenshot(options);
+        } finally {
+          await page.evaluate(() => {
+            globalThis.document.querySelector("main[data-transient-private]")?.remove();
+          });
+        }
+      };
+    }
+    if (state.id === "optional-mask-dom-transient-addition") {
+      const screenshot = page.screenshot.bind(page);
+      page.screenshot = async (options) => {
+        await page.evaluate(() => {
+          const added = globalThis.document.createElement("aside");
+          added.dataset.optionalPrivate = "true";
+          added.textContent = "transient optional private content";
+          globalThis.document.body.append(added);
+        });
+        record(`optional-transient-masked-screenshot:${options?.mask?.length ?? 0}`);
+        try {
+          return await screenshot(options);
+        } finally {
+          await page.evaluate(() => {
+            globalThis.document.querySelector("aside[data-optional-private]")?.remove();
+          });
+        }
       };
     }
   },

@@ -478,14 +478,14 @@ reporting, `uiwitness check <url>` orchestration, overwrite-safe
 check → promotion → scan → open release gate are implemented. Keep future work in
 an explicitly approved roadmap slice.
 
-The approved State Contract Guard roadmap is active. T1 through T9 are
+The approved State Contract Guard roadmap is active. T1 through T10 are
 complete: strict contracts and RFC 8785 digests, exhaustive deterministic
 comparison, complete fresh-run `uiwitness guard` orchestration,
 exact-coordinate reproduction, deterministic machine verdicts, immutable
 content-addressed proposals, constrained metadata overlays, and named
 single-use acceptance, and one crash-recoverable atomic generation transaction
 for report, evidence, verdict, proposal, overlay, manifest, JSON copy, and HTML,
-plus the contract-first offline verdict experience, thin full-SHA-pinned GitHub Action adapter with exact project-local CLI parity, bounded hosted output, minimum permissions, and opt-in evidence upload, complete exact/owned/visible/expiring exception governance, and memory-only shared-read-only authentication. T10 through T14 remain separate approved slices and must not be pulled forward
+plus the contract-first offline verdict experience, thin full-SHA-pinned GitHub Action adapter with exact project-local CLI parity, bounded hosted output, minimum permissions, and opt-in evidence upload, complete exact/owned/visible/expiring exception governance, memory-only shared-read-only authentication, and fail-closed masking with explicit evidence retention. T11 through T14 remain separate approved slices and must not be pulled forward
 implicitly.
 
 At each handoff provide: API implemented; behavior; fixture and

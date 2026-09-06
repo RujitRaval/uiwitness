@@ -17,6 +17,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  EVIDENCE_MANIFEST_PATH,
   REPORT_SCHEMA_VERSION,
   canonicalizeJson,
   contractProposalDigest,
@@ -25,14 +26,15 @@ import {
   createContractProposalSource,
   emptyContractProposalMetadata,
   generationManifestDigest,
+  parseAnyGenerationManifest,
   parseCommittedGeneration,
+  parseEvidenceManifest,
   parseExecutionResult,
-  parseGenerationManifest,
   parseReport,
   serializeContractProposal,
   serializeContractProposalMetadata,
   serializeContractProposalSource,
-  serializeGenerationManifest,
+  serializePrivacyGenerationManifest,
   type JsonValue,
 } from "uiwitness-core";
 
@@ -80,6 +82,27 @@ const evidenceArtifact = Object.freeze({
     viewportId: "desktop",
   }),
   screenshot: Uint8Array.of(1, 2, 3, 4),
+});
+const covered = Object.freeze({ covered: 1, percentage: 100, total: 1 });
+const evidenceReport = parseReport({
+  executions: [evidenceArtifact.result],
+  generatedAt: "2026-09-04T00:00:00.000Z",
+  project: { baseURL: "https://uiwitness.invalid" },
+  schemaVersion: REPORT_SCHEMA_VERSION,
+  summary: {
+    coverage: {
+      execution: covered,
+      responsive: covered,
+      state: covered,
+      theme: covered,
+    },
+    durationMs: 1,
+    executions: 1,
+    failed: 0,
+    passed: 1,
+    routes: 1,
+    states: 1,
+  },
 });
 
 async function temporaryProject(): Promise<string> {
@@ -205,17 +228,28 @@ describe("atomic generation persistence", () => {
       const marker = parseCommittedGeneration(
         await readFile(join(root, ".uiwitness/generation.json"), "utf8"),
       );
-      const manifest = parseGenerationManifest(
+      const manifest = parseAnyGenerationManifest(
         await readFile(join(root, marker.manifestPath), "utf8"),
+      );
+      const evidenceManifest = parseEvidenceManifest(
+        await readFile(join(root, ...EVIDENCE_MANIFEST_PATH.split("/")), "utf8"),
       );
 
       expect(marker).toEqual(committed);
       expect(generationManifestDigest(manifest)).toBe(marker.manifestDigest);
+      expect(evidenceManifest).toMatchObject({
+        generationDigest: runDigest,
+        reportDigest: manifest.reportDigest,
+        verdictDigest: manifest.artifacts.find(
+          ({ role }) => role === "contract-verdict",
+        )?.digest,
+      });
       expect(manifest.artifacts.map(({ role }) => role)).toEqual([
         "contract-metadata",
         "contract-proposal",
         "contract-source",
         "contract-verdict",
+        "evidence-manifest",
         "report-html",
         "report-json",
         "json-copy",
@@ -511,8 +545,9 @@ describe("atomic generation persistence", () => {
       const markerContents = await readFile(markerPath, "utf8");
       const marker = parseCommittedGeneration(markerContents);
       const manifestPath = join(root, marker.manifestPath);
-      const manifest = parseGenerationManifest(await readFile(manifestPath, "utf8"));
-      await writeFile(manifestPath, serializeGenerationManifest({
+      const manifest = parseAnyGenerationManifest(await readFile(manifestPath, "utf8"));
+      if (manifest.schemaVersion !== 2) throw new Error("Expected a privacy generation.");
+      await writeFile(manifestPath, serializePrivacyGenerationManifest({
         ...manifest,
         toolVersion: `${manifest.toolVersion}-changed`,
       }));
@@ -697,6 +732,25 @@ describe("atomic generation persistence", () => {
     }
   });
 
+  it("rejects caller-supplied runner-owned generation roles", async () => {
+    const root = await temporaryProject();
+    try {
+      const lock = await acquirePersistenceLock(root);
+      await expect(persistReport(root, lock, report, [], undefined, {
+        artifacts: [{
+          contents: "{}\n",
+          path: "private/forged-manifest.json",
+          publication: "replace",
+          role: "evidence-manifest",
+        } as never],
+        toolVersion: "0.26.8",
+      })).rejects.toThrow("sidecars cannot use runner-owned artifact roles");
+      await releasePersistenceLock(lock);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   it("rejects a contract verdict whose run digest differs from the generation", async () => {
     const root = await temporaryProject();
     try {
@@ -792,7 +846,7 @@ describe("atomic generation persistence", () => {
       });
       bytes.fill(0x20);
       const committed = await persisted;
-      const manifest = parseGenerationManifest(
+      const manifest = parseAnyGenerationManifest(
         await readFile(join(root, committed.manifestPath), "utf8"),
       );
       const verdict = manifest.artifacts.find(({ role }) => role === "contract-verdict")!;
@@ -832,7 +886,7 @@ describe("atomic generation persistence", () => {
     const traceLock = await acquirePersistenceLock(traceRoot);
     const trace: string[] = [];
     try {
-      await persistReport(traceRoot, traceLock, report, [evidenceArtifact], {
+      await persistReport(traceRoot, traceLock, evidenceReport, [evidenceArtifact], {
         link: async (source, destination) => {
           trace.push("swap");
           await link(source, destination);
@@ -883,7 +937,7 @@ describe("atomic generation persistence", () => {
         await action();
       };
       try {
-        await expect(persistReport(root, lock, report, [evidenceArtifact], {
+        await expect(persistReport(root, lock, evidenceReport, [evidenceArtifact], {
           link: (source, destination) =>
             inject("swap", () => link(source, destination)),
           remove: rm,

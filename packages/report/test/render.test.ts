@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 
-import { calculateCoverage, parseReport, REPORT_SCHEMA_VERSION } from "uiwitness-core";
+import {
+  EVIDENCE_MANIFEST_SCHEMA_VERSION,
+  REPORT_SCHEMA_VERSION,
+  calculateCoverage,
+  parseReport,
+  serializeReport,
+  type UIWitnessEvidenceManifest,
+} from "uiwitness-core";
 import { describe, expect, it } from "vitest";
 
 import { renderReportHtml } from "../src/render.js";
@@ -11,6 +18,38 @@ import {
 } from "./fixture.js";
 
 describe("renderReportHtml", () => {
+  it("binds privacy metadata to the exact report before rendering it", () => {
+    const report = reportFixture();
+    const reportDigest = `sha256:${createHash("sha256")
+      .update(serializeReport(report))
+      .digest("hex")}` as const;
+    const manifest: UIWitnessEvidenceManifest = {
+      attempted: report.executions.length,
+      captured: report.executions.length,
+      generationDigest: reportDigest,
+      masks: [],
+      omitted: 0,
+      reportDigest,
+      retention: "all",
+      schemaVersion: EVIDENCE_MANIFEST_SCHEMA_VERSION,
+      verdictDigest: null,
+    };
+
+    expect(renderReportHtml(report, { evidenceManifest: manifest })).toContain(
+      "Evidence privacy",
+    );
+    expect(() => renderReportHtml(report, {
+      evidenceManifest: { ...manifest, reportDigest: `sha256:${"f".repeat(64)}` },
+    })).toThrow("Evidence manifest does not match");
+    expect(() => renderReportHtml(report, {
+      evidenceManifest: {
+        ...manifest,
+        captured: report.executions.length - 1,
+        omitted: 1,
+      },
+    })).toThrow("Evidence manifest does not match");
+  });
+
   it("renders a polished offline matrix and execution details", () => {
     const html = renderReportHtml(reportFixture());
 
@@ -141,7 +180,7 @@ describe("renderReportHtml", () => {
 
     const html = renderReportHtml(report);
 
-    expect(html).toContain("Screenshot unavailable");
+    expect(html).toContain("Screenshot capture failed");
     expect(html).toContain("Not available");
     expect(html).toContain("10 s");
     expect(html).toContain("<strong>POST</strong>");
