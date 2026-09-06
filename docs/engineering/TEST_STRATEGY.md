@@ -62,6 +62,12 @@ The contract-first report suite covers every finding kind and fixed product labe
 
 Registry retry coverage also requires `--prefer-online`, a distinct temporary cache for every attempt, and the complete ten-minute elapsed-time window.
 
+## Documentation contracts
+
+The State Contract Guard operator guide is checked against the executable command grammar for `guard`, `guard shard-plan`, `guard --shard`, `guard merge`, and `contract init|inspect|annotate|accept`. Documentation review also verifies exit-code meaning, report-schema v1/v2 compatibility, authentication/sharding exclusion, default-off evidence upload, full-SHA Action pinning, proposal single-use behavior, exception expiry, and the separation between T13 guidance and T14 release proof.
+
+`node scripts/check-docs.mjs` requires every Markdown document to have one level-one heading, a final newline, no trailing whitespace, and valid local links. `corepack pnpm brand:check` enforces the identity migration ratchet. The repository script suite protects exact migration notices, Action examples, shard workflow commands, and release guidance.
+
 ## Determinism
 Repeated unchanged runs should produce stable IDs, paths, statuses, and materially stable screenshots. Remove animations/caret and settle fonts.
 

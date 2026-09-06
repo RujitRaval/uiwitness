@@ -1,6 +1,6 @@
 # CLI API
 
-`uiwitness` exposes zero-config public-site checking, deterministic config loading, and executable `init`, `scan`, `guard`, `contract`, and `open` workflows. Check composes bounded runner discovery, fixed public-site evidence, and the report-generation contracts. Scan composes the core planner and configured runner. Guard compares one complete fresh run with a committed state contract. Contract commands initialize, inspect, annotate, and explicitly accept immutable proposals. Open launches the generated offline HTML report; report transformation and rendering stay owned by `uiwitness-report`.
+`uiwitness` exposes zero-config public-site checking, deterministic config loading, and executable `init`, `scan`, `guard`, `contract`, and `open` workflows. Check composes bounded runner discovery, fixed public-site evidence, and the report-generation contracts. Scan composes the core planner and configured runner. Guard compares one complete fresh run with a committed state contract. Contract commands initialize, inspect, annotate, and explicitly accept immutable proposals. Open launches the generated offline HTML report; report transformation and rendering stay owned by `uiwitness-report`. The [State Contract Guard guide](../open-source/STATE_CONTRACT_GUARD.md) is the task-oriented entry point; this document is the exact executable and programmatic reference.
 
 ## Executable
 

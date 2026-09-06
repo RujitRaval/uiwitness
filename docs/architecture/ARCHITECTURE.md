@@ -3,6 +3,8 @@
 ## Flow
 `CLI -> config/contract validation -> core matrix -> Playwright runner -> core contract comparison -> report renderer -> one committed evidence/verdict/proposal generation`
 
+The complete system, data/shadow paths, generation/proposal/shard state machines, error routing, CI sequence, rollback flow, and report information architecture are diagrammed in [State Contract Guard Architecture](STATE_CONTRACT_GUARD.md).
+
 ## Monorepo
 ```text
 apps/example-nextjs

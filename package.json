@@ -1,6 +1,6 @@
 {
   "name": "uiwitness-workspace",
-  "version": "0.26.11",
+  "version": "0.26.12",
   "private": true,
   "description": "Every exercised UI state leaves evidence.",
   "license": "MIT",

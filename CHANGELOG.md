@@ -4,6 +4,19 @@ All notable changes to UIWitness will be documented in this file.
 
 This project uses the four-part version format required by the GStack ship workflow.
 
+## [0.26.12.0] - 2026-09-06
+
+### Added
+
+- A canonical State Contract Guard operator guide now covers first-contract creation, fresh-run enforcement, named proposal acceptance, expiring known failures, memory-only authentication, evidence privacy, GitHub Actions, deterministic sharding, output interpretation, recovery, and compatibility.
+- A dedicated architecture reference now diagrams the system and data boundaries, generation/proposal/shard state machines, error flow, CI sequence, rollback behavior, and report information hierarchy.
+- Documentation contract tests now compare the guide's command forms with the shipped CLI grammar and preserve the T13/T14 scope boundary.
+
+### Changed
+
+- README, architecture, security, CLI, report, Action, migration, testing, product, and agent guidance now use one consistent State Contract Guard entry point and mark T13 complete.
+- The roadmap now leaves only T14's package, Action, provenance, and registry-consumer release proof inside the approved State Contract Guard sequence.
+
 ## [0.26.11.0] - 2026-09-06
 
 ### Added

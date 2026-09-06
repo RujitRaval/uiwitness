@@ -43,3 +43,7 @@ The renderer accepts an optional validated schema-v1 contract verdict without ch
 ## State Contract Guard T10 delivery
 
 Privacy-policy reports distinguish a retained screenshot, policy-driven omission, and capture failure instead of rendering every absent image alike. A no-script privacy panel names the retention policy, attempted/captured/omitted totals, and successful mask IDs/cardinalities only after the selector-free evidence manifest binds to the exact report digest and counts. Default `all` output remains schema v1; `failures-only` and `none` use report schema v2 without changing the existing visual hierarchy, filters, offline boundary, or keyboard behavior.
+
+## State Contract Guard T13 documentation
+
+The [operator guide](../open-source/STATE_CONTRACT_GUARD.md) defines how users enter, interpret, and recover from the contract-first report. The [architecture diagrams](../architecture/STATE_CONTRACT_GUARD.md) preserve the approved information hierarchy: contract verdict, actionable findings, evidence matrix, dominant inspector, then contract/run/privacy/shard/generation details. Ordinary `scan` and `check` remain execution-first and do not imply contract mutation.

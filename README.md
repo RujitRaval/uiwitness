@@ -81,7 +81,7 @@ Once a repository has a committed `uiwitness.contract.json`, guard every promise
 npx uiwitness guard
 ```
 
-Guard exits `0` when the contract matches, `1` for regressions or unaccepted drift, and `2` when an invalid or incomplete run cannot prove the contract. It writes `.uiwitness/contract-verdict.json`, gives executable findings an exact headed `scan --coordinate route/state/viewport/theme` reproduction command, and places the promise verdict plus actionable findings before the existing evidence matrix in the offline report. The [CLI API](docs/engineering/CLI_API.md), [core API](docs/engineering/CORE_API.md), and [report API](docs/engineering/REPORT_API.md) define the path, fingerprint, contract, digest, verdict, and rendering contracts.
+Guard exits `0` when the contract matches, `1` for regressions or unaccepted drift, and `2` when an invalid or incomplete run cannot prove the contract. It writes `.uiwitness/contract-verdict.json`, gives executable findings an exact headed `scan --coordinate route/state/viewport/theme` reproduction command, and places the promise verdict plus actionable findings before the existing evidence matrix in the offline report. Start with the [State Contract Guard guide](docs/open-source/STATE_CONTRACT_GUARD.md); the [CLI API](docs/engineering/CLI_API.md), [core API](docs/engineering/CORE_API.md), and [report API](docs/engineering/REPORT_API.md) define the exact path, fingerprint, contract, digest, verdict, and rendering contracts.
 
 Create the first contract from one complete run, or review a failed guard's immutable proposal one named change at a time:
 
@@ -157,6 +157,7 @@ Every completed scan writes a versioned report beneath `.uiwitness/`:
 ├── contract-verdict.json  # deterministic guard verdict
 ├── generation.json        # stable committed-generation marker
 ├── generations/           # content-addressed generation manifests
+├── shards/                # immutable partial bundles when sharding
 └── report/
     ├── evidence-manifest.json # retention, safe mask counts, and digests
     ├── index.html         # self-contained interactive report
@@ -198,7 +199,7 @@ configure → expand matrix → run isolated browser cells → compare contract 
 - Console, page, and request diagnostics are sanitized before persistence.
 - `.uiwitness/` is ignored because reports may contain sensitive application data.
 
-Read the [architecture](docs/architecture/ARCHITECTURE.md), [security and privacy model](docs/engineering/SECURITY_PRIVACY.md), [report UX specification](docs/product/REPORT_UX_SPEC.md), and [brand research](docs/design/BRAND_RESEARCH.md) for the detailed contracts. The repository-level [design system](DESIGN.md) is the visual source of truth.
+Read the [architecture](docs/architecture/ARCHITECTURE.md), [State Contract Guard diagrams](docs/architecture/STATE_CONTRACT_GUARD.md), [security and privacy model](docs/engineering/SECURITY_PRIVACY.md), [report UX specification](docs/product/REPORT_UX_SPEC.md), and [brand research](docs/design/BRAND_RESEARCH.md) for the detailed contracts. The repository-level [design system](DESIGN.md) is the visual source of truth.
 
 ## Develop and contribute
 
@@ -219,7 +220,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). The [Quick Check guide](docs/open
 
 ## Roadmap
 
-The current release is the local-first v0.1 product: explicit matrices, deterministic Playwright scenarios, offline evidence, CI usage, a complete example, the completed [public URL Quick Check](docs/designs/public-url-quick-check.md), and T1–T12 of the approved [State Contract Guard roadmap](docs/designs/uiwitness-state-contract-guard.md), through nonce-bound deterministic shard plans, immutable partial bundles, and fail-closed aggregation into one final verdict generation. Documentation consolidation and release proof remain sequenced roadmap work. Hosted collaboration remains out of scope unless real demand appears.
+The current release is the local-first v0.1 product: explicit matrices, deterministic Playwright scenarios, offline evidence, CI usage, a complete example, the completed [public URL Quick Check](docs/designs/public-url-quick-check.md), and T1–T13 of the approved [State Contract Guard roadmap](docs/designs/uiwitness-state-contract-guard.md), including the canonical operator guide and architecture diagrams. T14 remains the separate package, Action, provenance, and registry-consumer release proof. Hosted collaboration remains out of scope unless real demand appears.
 
 ## License
 

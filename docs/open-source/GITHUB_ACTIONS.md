@@ -1,6 +1,6 @@
 # GitHub Actions
 
-UIWitness ships a thin composite Action that runs the `uiwitness` version already installed and locked by your repository. It never downloads product logic, reads pull-request text, mutates the pull request, or uploads evidence unless you explicitly enable that step.
+UIWitness ships a thin composite Action that runs the `uiwitness` version already installed and locked by your repository. It never downloads product logic, reads pull-request text, mutates the pull request, or uploads evidence unless you explicitly enable that step. Use the [State Contract Guard guide](STATE_CONTRACT_GUARD.md) for the complete local-to-CI lifecycle; this page owns the copy-ready GitHub configuration.
 
 ## Install and pin
 
