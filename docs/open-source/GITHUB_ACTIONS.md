@@ -101,6 +101,12 @@ The step summary includes totals by finding kind and the first 20 findings in ca
 
 Do not convert a nonzero Action result into success. That would hide both product-state regressions and runs that could not prove the contract.
 
+## Sharded matrix execution
+
+For a large unauthenticated matrix, use the reviewed [four-shard workflow example](examples/uiwitness-sharded.yml). One job creates a nonce-bound plan, four matrix jobs publish distinct immutable bundles, and one final job passes every explicit bundle directory to `uiwitness guard merge`. Merge order does not matter; the CLI verifies every manifest header and checksum, exact `1..M` completeness, current config/contract/target/tool identity, plan lifetime, execution assignment, and evidence-path uniqueness before comparison or final publication.
+
+The example deliberately uploads partial evidence because separate jobs need a transfer channel. It pins both artifact Actions to full commits and retains inputs for one day. These bundles can contain screenshots and private route/state inventories, so do not use this pattern for sensitive evidence in a public repository. Authentication remains unsupported for sharded runs. A failed or missing matrix job prevents the merge job from publishing final truth; rerun from a fresh plan rather than reusing an expired or incomplete run set.
+
 ## Evidence upload
 
 Evidence upload is off by default. Enable it only when the repository and captured application data are appropriate for GitHub artifact storage:

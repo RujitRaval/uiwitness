@@ -90,6 +90,36 @@ function digest(contents: string | Uint8Array): Sha256Digest {
   return `sha256:${createHash("sha256").update(contents).digest("hex")}`;
 }
 
+function shardEvidence(
+  report: AnyUIWitnessReport,
+  artifacts: readonly ExecutionArtifact[],
+): UIWitnessShardBundleManifest["evidence"] {
+  const cardinalities = new Map<string, number[]>();
+  for (const artifact of artifacts) {
+    for (const mask of artifact.masks ?? []) {
+      const values = cardinalities.get(mask.id) ?? [];
+      values.push(mask.count);
+      cardinalities.set(mask.id, values);
+    }
+  }
+  return Object.freeze({
+    attempted: artifacts.filter((artifact) =>
+      artifact.screenshotAttempted ?? artifact.screenshot !== null
+    ).length,
+    captured: artifacts.filter(({ screenshot }) => screenshot !== null).length,
+    masks: Object.freeze([...cardinalities]
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .map(([id, values]) => Object.freeze({
+        cardinalities: Object.freeze([...values].sort((left, right) => left - right)),
+        id,
+      }))),
+    omitted: artifacts.filter(({ screenshot }) => screenshot === null).length,
+    retention: report.schemaVersion === REPORT_SCHEMA_VERSION
+      ? "all"
+      : report.evidence.retention,
+  });
+}
+
 async function projectRoot(directory: string | undefined): Promise<string> {
   const candidate = resolve(directory ?? process.cwd());
   const metadata = await stat(candidate);
@@ -295,6 +325,7 @@ export async function publishShardBundle(
       configDigest: plan.configDigest,
       contractDigest: plan.contractDigest,
       createdAt: plan.createdAt,
+      evidence: shardEvidence(report, artifacts),
       environmentId: plan.environmentId,
       evaluatedOn: plan.evaluatedOn,
       executedCoordinateIds: Object.freeze(executedCoordinateIds),

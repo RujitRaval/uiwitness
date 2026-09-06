@@ -4,6 +4,24 @@ All notable changes to UIWitness will be documented in this file.
 
 This project uses the four-part version format required by the GStack ship workflow.
 
+## [0.26.11.0] - 2026-09-06
+
+### Added
+
+- Teams can now merge a complete set of immutable State Contract Guard shard bundles with `uiwitness guard merge --input <bundle>...` and publish one authoritative report, verdict, and optional proposal generation.
+- Core, CLI, and Playwright runner packages now expose validated manifest-v2 evidence summaries and programmatic shard-aggregation APIs.
+- The GitHub Actions guide now includes a full-SHA-pinned four-worker workflow that transfers every shard bundle and runs exactly one final merge job.
+
+### Changed
+
+- Sharded output is normalized back into deterministic configuration order, so a complete merged report is byte-equivalent to the corresponding unsharded report regardless of bundle arrival order.
+- State Contract Guard guidance now marks T12 complete while preserving documentation consolidation and release proof as separate T13 and T14 slices.
+
+### Security
+
+- Aggregation fails closed on incomplete, duplicate, overlapping, mixed, expired, drifted, linked, oversized, path-colliding, extra, or checksum-invalid inputs before comparison or final publication.
+- Merge validation uses bounded sequential reads, rechecks plan expiry after acquiring the publication lock, validates evidence-retention and mask summaries, and preserves the prior committed generation if finalization fails.
+
 ## [0.26.10.0] - 2026-09-05
 
 ### Added

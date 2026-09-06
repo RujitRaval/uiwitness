@@ -11,6 +11,7 @@ uiwitness scan [--config <path>] [--route <id> | --coordinate <route/state/viewp
 uiwitness guard [--config <path>] [--contract <path>] [--json <path>]
 uiwitness guard shard-plan --shards <M> --out <path> [--config <path>] [--contract <path>] [--environment-id <id>] [--ttl <5m-1440m>]
 uiwitness guard --shard <N/M> --shard-plan <path> [--config <path>] [--contract <path>]
+uiwitness guard merge --input <shard-bundle>... [--config <path>] [--contract <path>]
 uiwitness contract init [--config <path>] [--contract <path>]
 uiwitness contract inspect --candidate <path> --change <id>
 uiwitness contract annotate --candidate <path> --change <id> --owner <text> --reason <text> --created-on <date> --expires-on <date>
@@ -33,7 +34,7 @@ The config imports `defineConfig` from the installed `uiwitness` package and dec
 
 No force flag exists. Before writing, initialization checks every supported default config name, the generated scenario, and every directory boundary. Any existing config, an existing scenario, or a symbolic-link starter directory produces exit code `2`. Files use exclusive creation, the config is published last, and alternate config names are rechecked before success is reported. Failure recovery never deletes a path, because a concurrent process could have replaced a newly created file; write failures list the affected targets for inspection before retrying.
 
-Missing or unsupported commands, malformed check/scan/guard/contract options, extra `init` or `open` arguments, invalid public URLs, discovery/config/contract errors, unknown route IDs or coordinates, unsafe guard paths, stale or mutated proposals, concurrent contract writers, absent/invalid HTML reports, launcher failures, and run-level failures return `2`. Help, successful opens, contract inspection/annotation/acceptance, shard-plan creation, completed immutable shard bundles, all-pass checks/scans, and matching complete guards return `0`. A shard bundle remains merge input and therefore returns `0` even when it records failed cells. A completed check or scan containing failed cells returns `1` after persisting its report; a complete guard with contract failures or unaccepted drift and a contract initialization that requires proposal review also return `1`.
+Missing or unsupported commands, malformed check/scan/guard/contract options, extra `init` or `open` arguments, invalid public URLs, discovery/config/contract errors, unknown route IDs or coordinates, unsafe guard paths, stale or mutated proposals, concurrent contract writers, absent/invalid HTML reports, launcher failures, incomplete/invalid shard merges, and run-level failures return `2`. Help, successful opens, contract inspection/annotation/acceptance, shard-plan creation, completed immutable shard bundles, all-pass checks/scans, and matching complete or merged guards return `0`. A shard bundle remains merge input and therefore returns `0` even when it records failed cells. A completed check or scan containing failed cells returns `1` after persisting its report; a complete guard or aggregate with contract failures or unaccepted drift and a contract initialization that requires proposal review also return `1`.
 
 ## Programmatic command, check, init, scan, and open API
 
@@ -41,6 +42,7 @@ Missing or unsupported commands, malformed check/scan/guard/contract options, ex
 import {
   checkPublicSite,
   initProject,
+  mergeGuardShards,
   openReport,
   runCli,
   scanProject,
@@ -55,6 +57,10 @@ const check = await checkPublicSite({
 const result = await initProject({ cwd: process.cwd() });
 const exitCode = await runCli({ args: ["init"], cwd: process.cwd() });
 const scan = await scanProject({ cwd: process.cwd(), routeId: "dashboard" });
+const merged = await mergeGuardShards({
+  cwd: process.cwd(),
+  inputs: ["artifacts/<run-set>/1-of-2", "artifacts/<run-set>/2-of-2"],
+});
 const opened = await openReport({ cwd: process.cwd() });
 ```
 
@@ -74,7 +80,9 @@ Complete `guard` remains process-based orchestration. Its workspace is the canon
 
 `guard shard-plan` snapshots the complete current config inventory, including additions absent from the contract. It writes exact canonical JSON exclusively to `--out`, with a random 128-bit nonce, UTC creation/expiry, 5–1440 minute TTL (default 60), one-based shard count, ordered coordinate IDs, config/contract/target digests, report schema, and tool version. `--environment-id` defaults to `default` and uses lowercase kebab case. The target digest binds that non-secret ID to the normalized base-URL origin. `runSetId` hashes the full plan payload including the nonce. A distribution warning appears when the largest shard exceeds 1.5 times the mean; assignment remains fixed.
 
-`guard --shard N/M --shard-plan <path>` requires the same plan on every worker. Before browser launch it fails closed unless the plan is active and its shard total, complete current inventory, config/contract/target digests, report schema, and tool version still match. Assignment is `uint64be(SHA256(UTF8(coordinateId))[0..8]) mod M`. The runner exclusively creates `.uiwitness/shards/<runSetId>/<n>-of-<m>/`, writes retained evidence plus `report.json`, records byte counts and SHA-256 checksums, and writes canonical `manifest.json` last. It never takes the complete-report lock, updates the latest generation/report, compares a partial report, or creates a verdict/proposal. Authentication is rejected at both plan and shard start. `createGuardShardPlan` and `runGuardShard` expose the same operations programmatically. T12 owns bundle aggregation and the final verdict.
+`guard --shard N/M --shard-plan <path>` requires the same plan on every worker. Before browser launch it fails closed unless the plan is active and its shard total, complete current inventory, config/contract/target digests, report schema, and tool version still match. Assignment is `uint64be(SHA256(UTF8(coordinateId))[0..8]) mod M`. The runner exclusively creates `.uiwitness/shards/<runSetId>/<n>-of-<m>/`, writes retained evidence plus `report.json`, records byte counts and SHA-256 checksums plus privacy-safe capture totals in canonical manifest v2, and writes `manifest.json` last. It never takes the complete-report lock, updates the latest generation/report, compares a partial report, or creates a verdict/proposal. Authentication is rejected at plan, shard, and merge boundaries. `createGuardShardPlan` and `runGuardShard` expose the same operations programmatically.
+
+`guard merge` requires one repeated `--input` for every bundle directory and accepts arrival order without assigning meaning to it. The runner validates canonical manifests before reading report semantics, reconstructs the nonce-bound plan from the exact `1..M` assignment union, checks current config/contract/target/report/tool/lifetime identity, rejects duplicate or colliding paths, verifies the exact regular-file tree plus every size/checksum, and then validates each partial report. Only a complete coherent set is normalized into current deterministic configuration order for unsharded report equivalence and compared once using the coordinator's UTC date. The CLI and runner then reuse the ordinary contract and generation locks to atomically publish report, evidence, evidence manifest, verdict, optional proposal family, HTML, generation manifest, and committed marker. `mergeGuardShards` exposes the same operation programmatically; failed cells become the final contract verdict, while invalid inputs return setup error without replacing the prior generation.
 
 A configuration with neither authentication nor an explicit evidence policy retains the existing v1 coordinate fingerprint. Authentication or an explicit `evidence` block activates fingerprint v2. It adds the normalized evidence retention and canonically ordered mask definitions/scopes; when authentication is present it also adds the mode, canonical workspace-relative setup-module path, sorted normalized additional origins, and cookie scopes. The absent counterpart is represented by its default projection, so later authentication or evidence changes remain deterministic. Environment values, cookies, local storage, and captured auth state never participate. Introducing either block creates explicit config drift while untouched configurations retain stable fingerprints. Existing schema-v1 contracts remain readable; the first guarded run with either block emits named config changes that must be reviewed and accepted as the explicit fingerprint migration. The run digest hashes the canonical semantic report projection while excluding timestamps, durations, base URL, host paths, evidence bytes, and mtimes. Guard compares only the report returned by the same complete unfiltered run. Its canonical verdict contains schema version, completeness, evaluated UTC date, contract/config/run digests, overall verdict, message-free findings, and shell-safe exact-coordinate reproduction and remediation commands. A failed complete guard also prepares canonical content-addressed source/proposal files and a separately mutable canonical metadata overlay. The runner publishes those members, the default verdict, any exclusive `--json` copy, report/evidence, manifest, and marker in one crash-recoverable generation. Repeating an identical guard reuses identical immutable bytes and preserves an existing valid overlay.
 

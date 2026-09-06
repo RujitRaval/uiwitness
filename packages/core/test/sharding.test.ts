@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   SHARD_ASSIGNMENT_ALGORITHM,
+  SHARD_BUNDLE_MANIFEST_SCHEMA_VERSION,
   ShardValidationError,
   assertShardPlanActive,
   assignedShardCoordinateIds,
@@ -158,6 +159,13 @@ describe("deterministic sharding", () => {
       configDigest,
       contractDigest,
       createdAt: value.createdAt,
+      evidence: {
+        attempted: 0,
+        captured: 0,
+        masks: [],
+        omitted: 0,
+        retention: "none",
+      },
       environmentId: value.environmentId,
       evaluatedOn: value.evaluatedOn,
       executedCoordinateIds: [],
@@ -168,7 +176,7 @@ describe("deterministic sharding", () => {
       reportDigest,
       reportSchemaVersion: 2,
       runSetId: value.runSetId,
-      schemaVersion: 1,
+      schemaVersion: SHARD_BUNDLE_MANIFEST_SCHEMA_VERSION,
       shardCount: 3,
       shardIndex: 3,
       targetDigest: value.targetDigest,
@@ -176,6 +184,7 @@ describe("deterministic sharding", () => {
     };
 
     expect(parseShardBundleManifest(serializeShardBundleManifest(manifest))).toEqual(manifest);
+    expect(manifest.schemaVersion).toBe(2);
     expect(() => serializeShardBundleManifest({
       ...manifest,
       assignedCoordinateIds: ["home/default/desktop/light"],
@@ -190,6 +199,25 @@ describe("deterministic sharding", () => {
       ...manifest,
       assignedCoordinateIds: ["home/default/desktop/light"],
       executedCoordinateIds: ["home/default/desktop/light"],
+    })).toThrow(ShardValidationError);
+    expect(() => serializeShardBundleManifest({
+      ...manifest,
+      evidence: { ...manifest.evidence, attempted: 1 },
+    })).toThrow(ShardValidationError);
+    expect(() => serializeShardBundleManifest({
+      ...manifest,
+      evidence: { ...manifest.evidence, retention: "all" },
+    })).toThrow(ShardValidationError);
+    expect(() => serializeShardBundleManifest({
+      ...manifest,
+      evidence: {
+        attempted: 0,
+        captured: 0,
+        masks: [{ cardinalities: [0], id: "optional-mask" }],
+        omitted: 0,
+        retention: "all",
+      },
+      reportSchemaVersion: 1,
     })).toThrow(ShardValidationError);
   });
 });

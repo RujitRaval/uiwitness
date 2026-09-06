@@ -194,6 +194,8 @@ export {
 } from "./sharding.js";
 export type {
   CreateShardPlanInput,
+  ShardBundleEvidence,
+  ShardBundleEvidenceMask,
   ShardBundleFile,
   UIWitnessShardBundleManifest,
   UIWitnessShardPlan,

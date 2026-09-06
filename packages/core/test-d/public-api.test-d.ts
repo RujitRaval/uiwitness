@@ -27,6 +27,7 @@ import {
   ReportValidationError,
   ResultValidationError,
   SHARD_ASSIGNMENT_ALGORITHM,
+  SHARD_BUNDLE_MANIFEST_SCHEMA_VERSION,
   ShardValidationError,
   UIWitnessError,
   calculateCoverage,
@@ -62,6 +63,7 @@ import {
   parseAnyReport,
   parseReport,
   parseShardPlan,
+  parseShardBundleManifest,
   parseShardSpecifier,
   screenshotArtifactPath,
   serializeCommittedGeneration,
@@ -73,7 +75,9 @@ import {
   serializeEvidenceManifest,
   serializeReport,
   serializeShardPlan,
+  serializeShardBundleManifest,
   shardIndexForCoordinate,
+  shardPlanDigest,
   shardTargetDigest,
   validateAuthenticationStorageState,
   withContractProposalAnnotation,
@@ -132,6 +136,8 @@ import {
   type ProposedExpectation,
   type ScreenshotArtifactPath,
   type UIWitnessShardPlan,
+  type UIWitnessShardBundleManifest,
+  type ShardBundleEvidence,
   type Sha256Digest,
   type StateDefinition,
   type UIWitnessConfig,
@@ -258,7 +264,40 @@ const shardAssignment: number = shardIndexForCoordinate(
 const shardSpec: { readonly shardCount: number; readonly shardIndex: number } =
   parseShardSpecifier("1/2");
 const shardError: UIWitnessError = new ShardValidationError([]);
+const shardEvidence: ShardBundleEvidence = {
+  attempted: 0,
+  captured: 0,
+  masks: [],
+  omitted: shardPlan.coordinateIds.length,
+  retention: "all",
+};
+const shardManifest: UIWitnessShardBundleManifest = {
+  assignedCoordinateIds: shardPlan.coordinateIds,
+  assignmentAlgorithm: shardPlan.assignmentAlgorithm,
+  configDigest: shardPlan.configDigest,
+  contractDigest: shardPlan.contractDigest,
+  createdAt: shardPlan.createdAt,
+  environmentId: shardPlan.environmentId,
+  evaluatedOn: shardPlan.evaluatedOn,
+  evidence: shardEvidence,
+  executedCoordinateIds: shardPlan.coordinateIds,
+  expiresAt: shardPlan.expiresAt,
+  files: [{ bytes: 2, digest: configDigest, path: "report.json", role: "report" }],
+  nonce: shardPlan.nonce,
+  planDigest: shardPlanDigest(shardPlan),
+  reportDigest: configDigest,
+  reportSchemaVersion: shardPlan.reportSchemaVersion,
+  runSetId: shardPlan.runSetId,
+  schemaVersion: SHARD_BUNDLE_MANIFEST_SCHEMA_VERSION,
+  shardCount: shardPlan.shardCount,
+  shardIndex: 1,
+  targetDigest: shardPlan.targetDigest,
+  toolVersion: shardPlan.toolVersion,
+};
+const parsedShardManifest: UIWitnessShardBundleManifest =
+  parseShardBundleManifest(serializeShardBundleManifest(shardManifest));
 void SHARD_ASSIGNMENT_ALGORITHM;
+void parsedShardManifest;
 void shardAssignment;
 void shardSpec;
 void shardError;

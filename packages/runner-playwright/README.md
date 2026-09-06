@@ -1,6 +1,6 @@
 # uiwitness-runner-playwright
 
-The Playwright execution engine for UIWitness: isolated browser contexts, typed scenario hooks, deterministic navigation/readiness, screenshots, sanitized diagnostics, assertions, crash-recoverable local generation persistence, immutable partial shard bundles, and bounded public-route discovery.
+The Playwright execution engine for UIWitness: isolated browser contexts, typed scenario hooks, deterministic navigation/readiness, screenshots, sanitized diagnostics, assertions, crash-recoverable local generation persistence, immutable partial shard bundles, fail-closed aggregation, and bounded public-route discovery.
 
 ```ts
 import { discoverPublicRoutes } from "uiwitness-runner-playwright";
@@ -27,7 +27,7 @@ Configured runs may execute one trusted `AuthSetup` per complete run and seed ea
 
 Persistence owns only the `.uiwitness/` transaction tree and does not open or modify legacy `.statecraft/` evidence. Private modes, control-path and link checks, shared generation locking, authenticated process-death recovery, and coherent rollback apply to every committed member.
 
-`runShardScenarioCells` uses the same capture semantics for one exact nonce-bound assignment, then publishes only `.uiwitness/shards/<runSetId>/<n>-of-<m>/`. Its checksummed `manifest.json` is written last, existing paths are never replaced, and neither the latest report nor its generation lock is touched. Authentication and final aggregation are intentionally outside this T11 runner boundary.
+`runShardScenarioCells` uses the same capture semantics for one exact nonce-bound assignment, then publishes only `.uiwitness/shards/<runSetId>/<n>-of-<m>/`. Its checksummed `manifest.json` is written last, existing paths are never replaced, and neither the latest report nor its generation lock is touched. `mergeShardScenarioBundles` accepts every explicit bundle root, validates the complete plan-bound set and all retained bytes independent of arrival order, then uses the normal crash-recoverable transaction for the only final publication. Authentication remains unsupported for sharded runs.
 
 Most users should install [`uiwitness`](https://www.npmjs.com/package/uiwitness). Use this package directly when composing the programmatic runner API.
 

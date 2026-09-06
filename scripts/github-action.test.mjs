@@ -677,3 +677,20 @@ test("the composite Action is thin, immutable, upload-off, and argv-safe", async
     "  annotation-cap:\n    description:",
   ].includes(entry)).length, 5);
 });
+
+test("the sharded workflow example transfers immutable bundles and merges exactly once", async () => {
+  const source = await readFile(
+    path.join(repositoryRoot, "docs", "open-source", "examples", "uiwitness-sharded.yml"),
+    "utf8",
+  );
+  assert.match(source, /^permissions:\n {2}contents: read$/mu);
+  assert.match(source, /fail-fast: false\n {6}matrix:\n {8}shard: \[1, 2, 3, 4\]/u);
+  assert.match(source, /uiwitness guard shard-plan --shards 4 --out uiwitness-shard-plan\.json --ttl 60m/u);
+  assert.match(source, /uiwitness guard --shard "\$SHARD_INDEX\/4" --shard-plan uiwitness-shard-plan\.json/u);
+  assert.match(source, /args\+=\(--input "\$bundle"\)/u);
+  assert.match(source, /uiwitness guard merge "\$\{args\[@\]\}"/u);
+  assert.equal((source.match(/actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/g) ?? []).length, 2);
+  assert.equal((source.match(/actions\/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c/g) ?? []).length, 2);
+  assert.equal((source.match(/retention-days: 1/g) ?? []).length, 2);
+  assert.doesNotMatch(source, /pull_request_target|workflow_run|continue-on-error|secrets\./u);
+});

@@ -12,6 +12,7 @@ import {
   runScenarioCells,
   runScenarioLifecycle,
   runShardScenarioCells,
+  mergeShardScenarioBundles,
   ShardBundleError,
   withGenerationTransactionLock,
   publicSiteScenario,
@@ -39,6 +40,8 @@ import {
   type PrivacyGenerationFinalizer,
   type GenerationSidecarArtifact,
   type LoadScenarioOptions,
+  type MergedShardScenarioRun,
+  type MergeShardScenarioBundlesOptions,
   type NavigatedScenarioCellExecutor,
   type NavigatedScenarioContext,
   type NavigationMetadata,
@@ -54,6 +57,7 @@ import {
   type RunScenarioCellsOptions,
   type RunShardScenarioCellsOptions,
   type ShardScenarioRun,
+  type ShardMergeFinalizer,
   type ScenarioCellExecutor,
   type ScenarioContext,
   type ScenarioCaptureEvidence,
@@ -63,7 +67,7 @@ import {
   type UIWitnessScenario,
   type PublicRouteDiscoveryErrorCode,
 } from "uiwitness-runner-playwright";
-import type { UIWitnessReport, UIWitnessShardPlan } from "uiwitness-core";
+import type { AnyUIWitnessReport, UIWitnessReport, UIWitnessShardPlan } from "uiwitness-core";
 
 const authSetup: AuthSetup = async (context: AuthSetupContext) => {
   void context.context;
@@ -212,6 +216,27 @@ const shardOptions: RunShardScenarioCellsOptions = {
 };
 const shardRun: Promise<ShardScenarioRun> =
   runShardScenarioCells([execution.cell], shardOptions);
+const shardMergeFinalizer: ShardMergeFinalizer = (
+  report: AnyUIWitnessReport,
+  plan: UIWitnessShardPlan,
+) => {
+  void report;
+  void plan;
+  return { toolVersion: "1.0.0" };
+};
+const shardMergeOptions: MergeShardScenarioBundlesOptions = {
+  baseURL: "https://uiwitness.invalid",
+  bundlePaths: [".uiwitness/shards/run-set/1-of-1"],
+  cells: [execution.cell],
+  configDigest: shardPlan.configDigest,
+  contractDigest: shardPlan.contractDigest,
+  finalizeGeneration: shardMergeFinalizer,
+  now: () => new Date(),
+  projectDirectory: process.cwd(),
+  toolVersion: shardPlan.toolVersion,
+};
+const mergedShardRun: Promise<MergedShardScenarioRun> =
+  mergeShardScenarioBundles(shardMergeOptions);
 const shardBundleError: Error = new ShardBundleError(
   "SHARD_BUNDLE_EXISTS",
   "Bundle exists.",
@@ -244,6 +269,7 @@ const generationManifestPath: Promise<string> = persistedRun.then(
   (run) => run.generation.manifestPath,
 );
 void lockedGenerationMutation;
+void mergedShardRun;
 void privacyCaptureOutcomes;
 void privacyGenerationFinalizer;
 declare const capture: CapturedScenarioCell;

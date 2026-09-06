@@ -9,6 +9,7 @@ import {
   defineConfig,
   initProject,
   loadConfig,
+  mergeGuardShards,
   openReport,
   runCli,
   runGuardShard,
@@ -34,6 +35,8 @@ import {
   type GuardShardPlanResult,
   type GuardShardResult,
   type GuardErrorCode,
+  type GuardMergeOptions,
+  type GuardMergeResult,
   type OpenReportErrorCode,
   type OpenReportOptions,
   type OpenReportResult,
@@ -117,6 +120,11 @@ const shardOptions: GuardShardOptions = {
   shardPlanPath: ".uiwitness/shard-plan.json",
 };
 const shardResult: Promise<GuardShardResult> = runGuardShard(shardOptions);
+const mergeOptions: GuardMergeOptions = {
+  cwd: "/tmp/example",
+  inputs: [".uiwitness/shards/run-set/1-of-1"],
+};
+const mergeResult: Promise<GuardMergeResult> = mergeGuardShards(mergeOptions);
 const guardCode: GuardErrorCode = "GUARD_SHARD_PLAN_MISMATCH";
 const guardError: Error = new GuardError(guardCode, "Plan mismatch.");
 const htmlReportPath: Promise<".uiwitness/report/index.html"> = scanResult.then(
@@ -152,6 +160,7 @@ void cliResult;
 void scanResult;
 void shardPlanResult;
 void shardResult;
+void mergeResult;
 void guardError;
 void htmlReportPath;
 void scanError;

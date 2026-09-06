@@ -56,6 +56,12 @@ export type {
   ShardBundleErrorCode,
   ShardScenarioRun,
 } from "./sharding.js";
+export { mergeShardScenarioBundles } from "./aggregation.js";
+export type {
+  MergedShardScenarioRun,
+  MergeShardScenarioBundlesOptions,
+  ShardMergeFinalizer,
+} from "./aggregation.js";
 export type {
   AnyPersistedScenarioRun,
   GenerationArtifactPublication,

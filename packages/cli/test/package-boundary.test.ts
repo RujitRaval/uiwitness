@@ -116,6 +116,7 @@ describe("uiwitness package boundary", () => {
       "discoverConfig",
       "initProject",
       "loadConfig",
+      "mergeGuardShards",
       "openReport",
       "runCli",
       "runGuardShard",
