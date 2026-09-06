@@ -101,7 +101,8 @@ function relativePath(root: string, path: string): string {
   return local.startsWith("--") ? `./${local}` : local;
 }
 
-async function contractFile(
+/** @internal Resolves one workspace-contained committed contract. */
+export async function guardContractFile(
   root: string,
   contractPath: string | undefined,
 ): Promise<string> {
@@ -129,7 +130,8 @@ async function contractFile(
   }
 }
 
-function evaluationInstant(now: (() => Date) | undefined): Date {
+/** @internal Captures one trustworthy evaluation instant. */
+export function guardEvaluationInstant(now: (() => Date) | undefined): Date {
   const value = (now ?? (() => new Date()))();
   if (!(value instanceof Date) || !Number.isFinite(value.valueOf())) {
     throw new RangeError("The guard clock must return a valid Date.");
@@ -155,7 +157,8 @@ function serializeMachineVerdict(verdict: GuardMachineVerdict): string {
   return `${canonicalizeJson(verdict as unknown as JsonValue)}\n`;
 }
 
-async function toolVersion(): Promise<string> {
+/** @internal Reads the CLI version used to bind guard artifacts. */
+export async function guardToolVersion(): Promise<string> {
   const manifest = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
   ) as { readonly version?: unknown };
@@ -222,7 +225,7 @@ export async function prepareContractProposal(input: {
     executions: contractSourceExecutions(input.report),
     runDigest: input.runDigest,
   });
-  const version = await toolVersion();
+  const version = await guardToolVersion();
   const proposal = createContractProposal(source, version);
   if (proposal.changes.length === 0) {
     throw new GuardError(
@@ -306,8 +309,8 @@ export async function guardProject(
     ? undefined
     : await preflightOutputPath(root, options.jsonPath, true);
   await preflightOutputPath(root, defaultVerdictPath, false);
-  const evaluatedAt = evaluationInstant(options.now);
-  const selectedContractPath = await contractFile(root, options.contractPath);
+  const evaluatedAt = guardEvaluationInstant(options.now);
+  const selectedContractPath = await guardContractFile(root, options.contractPath);
   const prevalidatedContract = parseContract(
     await readFile(selectedContractPath, "utf8"),
   );
@@ -370,7 +373,7 @@ export async function guardProject(
           sourceGenerationDigests: proposal === undefined
             ? []
             : [proposal.sourceGenerationDigest],
-          toolVersion: await toolVersion(),
+          toolVersion: await guardToolVersion(),
         };
       },
     });

@@ -26,6 +26,8 @@ import {
   PRIVACY_REPORT_SCHEMA_VERSION,
   ReportValidationError,
   ResultValidationError,
+  SHARD_ASSIGNMENT_ALGORITHM,
+  ShardValidationError,
   UIWitnessError,
   calculateCoverage,
   canonicalizeContract,
@@ -41,6 +43,7 @@ import {
   contractVerdictStatus,
   createContractProposal,
   createContractProposalSource,
+  createShardPlan,
   defineConfig,
   emptyContractProposalMetadata,
   expandMatrix,
@@ -58,6 +61,8 @@ import {
   parsePrivacyGenerationManifest,
   parseAnyReport,
   parseReport,
+  parseShardPlan,
+  parseShardSpecifier,
   screenshotArtifactPath,
   serializeCommittedGeneration,
   serializeContractProposal,
@@ -67,6 +72,9 @@ import {
   serializePrivacyGenerationManifest,
   serializeEvidenceManifest,
   serializeReport,
+  serializeShardPlan,
+  shardIndexForCoordinate,
+  shardTargetDigest,
   validateAuthenticationStorageState,
   withContractProposalAnnotation,
   type CanonicalJsonIssue,
@@ -123,6 +131,7 @@ import {
   type ResultValidationIssue,
   type ProposedExpectation,
   type ScreenshotArtifactPath,
+  type UIWitnessShardPlan,
   type Sha256Digest,
   type StateDefinition,
   type UIWitnessConfig,
@@ -228,6 +237,31 @@ void contractError;
 void canonicalIssue;
 void contractIssue;
 void knownFailureCode;
+
+const shardPlan: UIWitnessShardPlan = createShardPlan({
+  configDigest,
+  contractDigest: configDigest,
+  coordinateIds: ["dashboard/success/desktop/light"],
+  createdAt: new Date("2026-09-05T12:00:00.000Z"),
+  nonce: "0123456789abcdef0123456789abcdef",
+  reportSchemaVersion: 1,
+  shardCount: 2,
+  targetDigest: shardTargetDigest("https://example.com"),
+  toolVersion: "1.0.0",
+});
+const shardPlanText: string = serializeShardPlan(shardPlan);
+const parsedShardPlan: UIWitnessShardPlan = parseShardPlan(shardPlanText);
+const shardAssignment: number = shardIndexForCoordinate(
+  parsedShardPlan.coordinateIds[0]!,
+  parsedShardPlan.shardCount,
+);
+const shardSpec: { readonly shardCount: number; readonly shardIndex: number } =
+  parseShardSpecifier("1/2");
+const shardError: UIWitnessError = new ShardValidationError([]);
+void SHARD_ASSIGNMENT_ALGORITHM;
+void shardAssignment;
+void shardSpec;
+void shardError;
 
 const comparisonConfiguration: ContractConfigurationCoordinate = {
   configFingerprint: configDigest,

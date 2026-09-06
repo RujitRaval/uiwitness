@@ -47,6 +47,15 @@ export {
   runPersistedScenarioCells,
   withGenerationTransactionLock,
 } from "./persistence.js";
+export {
+  runShardScenarioCells,
+  ShardBundleError,
+} from "./sharding.js";
+export type {
+  RunShardScenarioCellsOptions,
+  ShardBundleErrorCode,
+  ShardScenarioRun,
+} from "./sharding.js";
 export type {
   AnyPersistedScenarioRun,
   GenerationArtifactPublication,

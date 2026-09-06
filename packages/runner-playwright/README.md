@@ -1,6 +1,6 @@
 # uiwitness-runner-playwright
 
-The Playwright execution engine for UIWitness: isolated browser contexts, typed scenario hooks, deterministic navigation/readiness, screenshots, sanitized diagnostics, assertions, crash-recoverable local generation persistence, and bounded public-route discovery.
+The Playwright execution engine for UIWitness: isolated browser contexts, typed scenario hooks, deterministic navigation/readiness, screenshots, sanitized diagnostics, assertions, crash-recoverable local generation persistence, immutable partial shard bundles, and bounded public-route discovery.
 
 ```ts
 import { discoverPublicRoutes } from "uiwitness-runner-playwright";
@@ -26,6 +26,8 @@ Configured runs support fail-closed named masks and `all`, `failures-only`, or `
 Configured runs may execute one trusted `AuthSetup` per complete run and seed each fresh cell context from a validated in-memory storage-state copy. No UIWitness-owned auth file is created; only the application origin and explicit cookie/origin scopes are allowed. The single supported mode is shared read-only.
 
 Persistence owns only the `.uiwitness/` transaction tree and does not open or modify legacy `.statecraft/` evidence. Private modes, control-path and link checks, shared generation locking, authenticated process-death recovery, and coherent rollback apply to every committed member.
+
+`runShardScenarioCells` uses the same capture semantics for one exact nonce-bound assignment, then publishes only `.uiwitness/shards/<runSetId>/<n>-of-<m>/`. Its checksummed `manifest.json` is written last, existing paths are never replaced, and neither the latest report nor its generation lock is touched. Authentication and final aggregation are intentionally outside this T11 runner boundary.
 
 Most users should install [`uiwitness`](https://www.npmjs.com/package/uiwitness). Use this package directly when composing the programmatic runner API.
 
