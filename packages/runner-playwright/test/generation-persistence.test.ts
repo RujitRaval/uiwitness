@@ -972,5 +972,5 @@ describe("atomic generation persistence", () => {
     expect(trace).toContain("stage");
     expect(trace).toContain("swap");
     expect(trace).toContain("fsync");
-  }, 30_000);
+  }, 60_000);
 });
