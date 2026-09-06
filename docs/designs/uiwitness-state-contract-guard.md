@@ -997,7 +997,7 @@ Synthesized from this review's findings. Execute in order; each item ships throu
   - Surfaced by: D13–D14 and Section 11 — privacy selectors must block unsafe capture and omission must be explicit in report schema v2.
   - Files: core evidence config/report-v2 schema, runner capture/persistence, report privacy UI, migration docs/tests.
   - Verify: mask/cardinality/failure-path matrix, no unmasked fallback, all retention semantics, v1/v2 readers, manifest accuracy.
-- [ ] **T11 (P1, human: ~4 days / Codex: ~6h)** — Core/CLI — Implement nonce-bound shard plans and immutable bundles
+- [x] **T11 (P1, human: ~4 days / Codex: ~6h)** — Core/CLI — Implement nonce-bound shard plans and immutable bundles
   - Surfaced by: D15, D21, D26 and Section 7 — shards must use the complete current config and cannot mix runs or authenticated shared accounts.
   - Files: core shard schemas/hash vectors, CLI plan/shard commands, runner bundle publisher, tests.
   - Verify: every `N/M`, nonce/target/TTL, additions absent from contract, empty shards, no-clobber paths, distribution benchmark.
