@@ -4,12 +4,15 @@ import {
   ConfigLoadError,
   DEFAULT_CONFIG_FILENAMES,
   checkPublicSite,
+  createGuardShardPlan,
   discoverConfig,
   defineConfig,
   initProject,
   loadConfig,
   openReport,
   runCli,
+  runGuardShard,
+  GuardError,
   scanProject,
   InitError,
   OpenReportError,
@@ -26,6 +29,11 @@ import {
   type InitErrorCode,
   type InitOptions,
   type InitResult,
+  type GuardShardOptions,
+  type GuardShardPlanOptions,
+  type GuardShardPlanResult,
+  type GuardShardResult,
+  type GuardErrorCode,
   type OpenReportErrorCode,
   type OpenReportOptions,
   type OpenReportResult,
@@ -95,6 +103,22 @@ const scanOptions: ScanOptions = {
   headed: false,
 };
 const scanResult: Promise<ScanResult> = scanProject(scanOptions);
+const shardPlanOptions: GuardShardPlanOptions = {
+  cwd: "/tmp/example",
+  outPath: ".uiwitness/shard-plan.json",
+  shards: 4,
+  ttlMinutes: 60,
+};
+const shardPlanResult: Promise<GuardShardPlanResult> =
+  createGuardShardPlan(shardPlanOptions);
+const shardOptions: GuardShardOptions = {
+  cwd: "/tmp/example",
+  shard: "1/4",
+  shardPlanPath: ".uiwitness/shard-plan.json",
+};
+const shardResult: Promise<GuardShardResult> = runGuardShard(shardOptions);
+const guardCode: GuardErrorCode = "GUARD_SHARD_PLAN_MISMATCH";
+const guardError: Error = new GuardError(guardCode, "Plan mismatch.");
 const htmlReportPath: Promise<".uiwitness/report/index.html"> = scanResult.then(
   (result) => result.htmlReportPath,
 );
@@ -126,6 +150,9 @@ void openResult;
 void openError;
 void cliResult;
 void scanResult;
+void shardPlanResult;
+void shardResult;
+void guardError;
 void htmlReportPath;
 void scanError;
 void coordinateCode;

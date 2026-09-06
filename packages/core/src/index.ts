@@ -154,6 +154,7 @@ export {
   GenerationValidationError,
   ReportValidationError,
   ResultValidationError,
+  ShardValidationError,
   UIWitnessError,
 } from "./errors.js";
 export type {
@@ -165,8 +166,38 @@ export type {
   GenerationValidationIssue,
   ReportValidationIssue,
   ResultValidationIssue,
+  ShardValidationIssue,
   UIWitnessErrorCode,
 } from "./errors.js";
+export {
+  SHARD_ASSIGNMENT_ALGORITHM,
+  SHARD_BUNDLE_MANIFEST_SCHEMA_VERSION,
+  SHARD_COORDINATE_LIMIT,
+  SHARD_COUNT_LIMIT,
+  SHARD_PLAN_SCHEMA_VERSION,
+  SHARD_TARGET_DIGEST_ALGORITHM,
+  SHARD_TTL_MINUTES_DEFAULT,
+  SHARD_TTL_MINUTES_MAX,
+  SHARD_TTL_MINUTES_MIN,
+  assertShardPlanActive,
+  assignedShardCoordinateIds,
+  createShardPlan,
+  parseShardBundleManifest,
+  parseShardPlan,
+  parseShardSpecifier,
+  serializeShardBundleManifest,
+  serializeShardPlan,
+  shardIndexForCoordinate,
+  shardPlanDigest,
+  shardPlanRunSetId,
+  shardTargetDigest,
+} from "./sharding.js";
+export type {
+  CreateShardPlanInput,
+  ShardBundleFile,
+  UIWitnessShardBundleManifest,
+  UIWitnessShardPlan,
+} from "./sharding.js";
 export { expandMatrix } from "./matrix.js";
 export type { MatrixCell, MatrixFilter } from "./matrix.js";
 export { screenshotArtifactPath } from "./artifacts.js";

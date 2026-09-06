@@ -171,7 +171,8 @@ export type PrivacyGenerationFinalizer = (
   report: Extract<AnyUIWitnessReport, { readonly schemaVersion: 2 }>,
 ) => GenerationFinalization | Promise<GenerationFinalization>;
 
-interface ExecutionArtifact {
+/** @internal In-memory execution output shared by complete and sharded publishers. */
+export interface ExecutionArtifact {
   readonly masks?: ScenarioCaptureEvidence["masks"];
   readonly result: ExecutionResult;
   readonly screenshot: Uint8Array | null;
@@ -354,7 +355,8 @@ export function executionArtifactForOutcome(
   });
 }
 
-function reportFor(
+/** @internal Builds a validated report without publishing it. */
+export function reportForExecutionArtifacts(
   cells: readonly MatrixCell[],
   artifacts: readonly ExecutionArtifact[],
   baseURL: string,
@@ -456,7 +458,7 @@ function validatePersistenceBoundary(
         : "omitted-by-policy",
     }),
   );
-  reportFor(
+  reportForExecutionArtifacts(
     cells,
     artifacts,
     baseURL,
@@ -2093,7 +2095,7 @@ export async function runPersistedScenarioCells(
     const artifacts = outcomes.map((outcome) =>
       executionArtifactForOutcome(outcome, options.baseURL, options.evidence),
     );
-    const report = reportFor(
+    const report = reportForExecutionArtifacts(
       cells,
       artifacts,
       options.baseURL,

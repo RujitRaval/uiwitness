@@ -117,6 +117,12 @@ Known failures match only when the observed unique sorted stable failure-code se
 
 The CLI adapts project config and the same run's in-memory schema-v1 or schema-v2 report into these inputs, persists a deterministic machine verdict, and exposes stable process semantics. The browser-independent comparison contract stays owned here.
 
+## Deterministic shard contracts
+
+`createShardPlan` builds schema-v1 canonical plans around a caller-generated 128-bit nonce. Plans bind the complete ordered coordinate inventory, config/contract/target digests, tool/report versions, one shard count, and a 5–1440 minute UTC lifetime. `shardTargetDigest` normalizes a base URL to its HTTP(S) origin and binds a non-secret lowercase-kebab environment ID. `shardPlanRunSetId` hashes the full plan payload including the nonce; `shardPlanDigest` hashes the complete plan.
+
+`shardIndexForCoordinate` implements the fixed zero-based assignment `uint64be(SHA256(UTF8(coordinateId))[0..8]) mod M`; `assignedShardCoordinateIds` adapts it to one-based CLI shards. `parseShardSpecifier` accepts exact `N/M`. `parseShardPlan` and `parseShardBundleManifest` require exact RFC 8785 source bytes and enforce canonical order, bounded coordinate/path counts, digests, timestamps, and complete assigned/executed identity. Invalid data raises `ShardValidationError`. These APIs perform no filesystem or browser work; T12 will consume the manifest contract for aggregation.
+
 ## Contract proposals and named acceptance
 
 `createContractProposalSource` snapshots one complete configuration inventory, source contract or `null`, fresh message-free execution outcomes, evaluated UTC date, and run digest. It rejects any source without exactly one execution for every configured coordinate. `createContractProposal` deterministically derives individually named `add`, `remove`, `config`, `expectation`, and `exception` operations. Change IDs are `<operation>:<route/state/viewport/theme>`; the proposal binds the source-generation, source-contract, config, and run digests plus its tool/schema versions.

@@ -6,7 +6,8 @@ export type UIWitnessErrorCode =
   | "CONTRACT_PROPOSAL_INVALID"
   | "GENERATION_INVALID"
   | "REPORT_INVALID"
-  | "RESULT_INVALID";
+  | "RESULT_INVALID"
+  | "SHARD_INVALID";
 
 /** Stable validation categories that do not expose validator-specific codes. */
 export type ConfigValidationIssueCode =
@@ -51,6 +52,9 @@ export interface ContractValidationIssue {
 
 /** A single generation-manifest or committed-marker validation problem. */
 export type GenerationValidationIssue = ContractValidationIssue;
+
+/** A single shard-plan or shard-bundle validation problem. */
+export type ShardValidationIssue = ContractValidationIssue;
 
 /** @internal Contract parsers retain 99 exact issues plus one omission marker. */
 export const CONTRACT_VALIDATION_ISSUE_LIMIT = 100;
@@ -127,6 +131,17 @@ export class GenerationValidationError extends UIWitnessError {
   constructor(issues: readonly GenerationValidationIssue[]) {
     super("GENERATION_INVALID", "Invalid UIWitness generation.");
     this.name = "GenerationValidationError";
+    this.issues = boundedContractIssues(issues);
+  }
+}
+
+/** Thrown when a shard plan or immutable shard manifest is invalid. */
+export class ShardValidationError extends UIWitnessError {
+  readonly issues: readonly ShardValidationIssue[];
+
+  constructor(issues: readonly ShardValidationIssue[]) {
+    super("SHARD_INVALID", "Invalid UIWitness shard data.");
+    this.name = "ShardValidationError";
     this.issues = boundedContractIssues(issues);
   }
 }

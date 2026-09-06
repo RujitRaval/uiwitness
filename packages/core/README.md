@@ -1,6 +1,6 @@
 # uiwitness-core
 
-Browser-independent UIWitness contracts for configuration and evidence-policy validation, state-contract parsing, canonical digests, deterministic comparison and verdicts, immutable proposals and named acceptance, committed-generation and evidence manifests, matrix expansion and artifact paths, coverage calculations, and schema-v1/v2 report parsing.
+Browser-independent UIWitness contracts for configuration and evidence-policy validation, state-contract parsing, canonical digests, deterministic comparison and verdicts, immutable proposals and named acceptance, committed-generation and evidence manifests, nonce-bound shard plans and bundle manifests, matrix expansion and artifact paths, coverage calculations, and schema-v1/v2 report parsing.
 
 ```ts
 import {
@@ -20,11 +20,15 @@ import {
   parseContract,
   parseGenerationManifest,
   parseReport,
+  parseShardPlan,
+  shardIndexForCoordinate,
   validateAuthenticationStorageState,
 } from "uiwitness-core";
 ```
 
 `contractExceptionLifecycle(exception, evaluatedOn)` returns the deterministic active or expired state and signed days until expiry using the same UTC calendar boundary as contract comparison.
+
+Shard plans use exact canonical JSON, a nonce-bound run-set ID, a bounded UTC lifetime, normalized target/config/contract identities, and fixed SHA-256/uint64be modulo assignment. Bundle manifests bind complete per-shard coordinate execution, report/evidence checksums, and the exact source plan for future T12 aggregation.
 
 `parseConfig` accepts strict shared-read-only authentication boundaries. `validateAuthenticationStorageState` enforces their exact local-storage origin and cookie domain/path/secure/partition scope without exposing secret values in errors.
 

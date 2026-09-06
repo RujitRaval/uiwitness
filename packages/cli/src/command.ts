@@ -8,7 +8,9 @@ import {
   ContractValidationError,
   GenerationValidationError,
   ResultValidationError,
+  ShardValidationError,
   contractExceptionLifecycle,
+  parseShardSpecifier,
   type ContractActualOutcome,
   type ContractExpectation,
   type ContractFinding,
@@ -40,6 +42,12 @@ import {
   guardProject,
   type GuardResult,
 } from "./guard.js";
+import {
+  createGuardShardPlan,
+  runGuardShard,
+  type GuardShardPlanResult,
+  type GuardShardResult,
+} from "./guard-shard.js";
 import { OpenReportError, openReport } from "./open.js";
 import { ScanError, scanProject, type ScanResult } from "./scan.js";
 
@@ -50,6 +58,8 @@ Usage:
   uiwitness check <url> [--max-pages <1-20>] [--headed] [--write-config]
   uiwitness scan [--config <path>] [--route <id> | --coordinate <route/state/viewport/theme>] [--headed]
   uiwitness guard [--config <path>] [--contract <path>] [--json <path>]
+  uiwitness guard shard-plan --shards <M> --out <path> [--config <path>] [--contract <path>] [--environment-id <id>] [--ttl <5m-1440m>]
+  uiwitness guard --shard <N/M> --shard-plan <path> [--config <path>] [--contract <path>]
   uiwitness contract init [--config <path>] [--contract <path>]
   uiwitness contract inspect --candidate <path> --change <id>
   uiwitness contract annotate --candidate <path> --change <id> --owner <text> --reason <text> --created-on <date> --expires-on <date>
@@ -62,7 +72,7 @@ Commands:
   init  Create a starter config and scenario without overwriting files
   check Discover and inspect a public site without configuration
   scan  Execute configured UI states and persist screenshots, JSON, and HTML
-  guard Run the complete matrix and compare it with the committed state contract
+  guard Run the complete matrix or produce deterministic partial shard bundles
   contract Initialize, inspect, annotate, or accept named contract changes
   open  Open the latest generated offline HTML report
 
@@ -105,11 +115,29 @@ interface ParsedScanArguments {
   readonly routeId?: string | undefined;
 }
 
-interface ParsedGuardArguments {
-  readonly configPath?: string | undefined;
-  readonly contractPath?: string | undefined;
-  readonly jsonPath?: string | undefined;
-}
+type ParsedGuardArguments =
+  | {
+      readonly command: "complete";
+      readonly configPath?: string | undefined;
+      readonly contractPath?: string | undefined;
+      readonly jsonPath?: string | undefined;
+    }
+  | {
+      readonly command: "shard";
+      readonly configPath?: string | undefined;
+      readonly contractPath?: string | undefined;
+      readonly shard: string;
+      readonly shardPlanPath: string;
+    }
+  | {
+      readonly command: "shard-plan";
+      readonly configPath?: string | undefined;
+      readonly contractPath?: string | undefined;
+      readonly environmentId?: string | undefined;
+      readonly outPath: string;
+      readonly shards: number;
+      readonly ttlMinutes?: number | undefined;
+    };
 
 type ParsedContractArguments =
   | ({ readonly command: "accept" } & ContractAcceptOptions)
@@ -215,16 +243,53 @@ function parseScanArguments(
 function parseGuardArguments(
   args: readonly string[],
 ): ParsedGuardArguments | string {
+  if (args[0] === "shard-plan") {
+    const parsed = parseNamedOptions(
+      args.slice(1),
+      new Set(["--config", "--contract", "--environment-id", "--out", "--shards", "--ttl"]),
+      new Set(),
+      "guard shard-plan",
+    );
+    if (typeof parsed === "string") return parsed;
+    const outPath = optionValue(parsed, "--out");
+    const shardsSource = optionValue(parsed, "--shards");
+    if (outPath === undefined || shardsSource === undefined) {
+      return "The guard shard-plan command requires --shards and --out.";
+    }
+    if (!/^(?:[1-9][0-9]{0,3}|10000)$/u.test(shardsSource)) {
+      return "The --shards option must be a whole number from 1 through 10000.";
+    }
+    const ttlSource = optionValue(parsed, "--ttl");
+    if (ttlSource !== undefined && !/^(?:[5-9]|[1-9][0-9]{1,2}|1[0-3][0-9]{2}|14[0-3][0-9]|1440)m$/u.test(ttlSource)) {
+      return "The --ttl option must use whole minutes from 5m through 1440m.";
+    }
+    const configPath = optionValue(parsed, "--config");
+    const contractPath = optionValue(parsed, "--contract");
+    const environmentId = optionValue(parsed, "--environment-id");
+    return Object.freeze({
+      command: "shard-plan" as const,
+      ...(configPath === undefined ? {} : { configPath }),
+      ...(contractPath === undefined ? {} : { contractPath }),
+      ...(environmentId === undefined ? {} : { environmentId }),
+      outPath,
+      shards: Number(shardsSource),
+      ...(ttlSource === undefined ? {} : { ttlMinutes: Number(ttlSource.slice(0, -1)) }),
+    });
+  }
   let configPath: string | undefined;
   let contractPath: string | undefined;
   let jsonPath: string | undefined;
+  let shard: string | undefined;
+  let shardPlanPath: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index]!;
     if (
       argument !== "--config" &&
       argument !== "--contract" &&
-      argument !== "--json"
+      argument !== "--json" &&
+      argument !== "--shard" &&
+      argument !== "--shard-plan"
     ) {
       return `Unknown guard option: ${argument}`;
     }
@@ -242,27 +307,49 @@ function parseGuardArguments(
         return "The --contract option can be specified only once.";
       }
       contractPath = value;
-    } else {
+    } else if (argument === "--json") {
       if (jsonPath !== undefined) {
         return "The --json option can be specified only once.";
       }
       jsonPath = value;
+    } else if (argument === "--shard") {
+      if (shard !== undefined) return "The --shard option can be specified only once.";
+      shard = value;
+    } else {
+      if (shardPlanPath !== undefined) return "The --shard-plan option can be specified only once.";
+      shardPlanPath = value;
     }
     index += 1;
   }
-  return Object.freeze({ configPath, contractPath, jsonPath });
+  if ((shard === undefined) !== (shardPlanPath === undefined)) {
+    return "The --shard and --shard-plan options must be provided together.";
+  }
+  if (shard !== undefined) {
+    if (jsonPath !== undefined) return "The --json option cannot be combined with a shard run.";
+    try {
+      parseShardSpecifier(shard);
+    } catch (error: unknown) {
+      if (error instanceof ShardValidationError) {
+        return "The --shard option must use the exact one-based N/M form.";
+      }
+      throw error;
+    }
+    return Object.freeze({ command: "shard", configPath, contractPath, shard, shardPlanPath: shardPlanPath! });
+  }
+  return Object.freeze({ command: "complete", configPath, contractPath, jsonPath });
 }
 
 function parseNamedOptions(
   args: readonly string[],
   allowed: ReadonlySet<string>,
   repeated: ReadonlySet<string> = new Set(),
+  label = "contract",
 ): ReadonlyMap<string, readonly string[]> | string {
   const values = new Map<string, string[]>();
   for (let index = 0; index < args.length; index += 2) {
     const option = args[index]!;
     const value = args[index + 1];
-    if (!allowed.has(option)) return `Unknown contract option: ${option}`;
+    if (!allowed.has(option)) return `Unknown ${label} option: ${option}`;
     if (value === undefined || value.startsWith("--")) {
       return `The ${option} option requires a value.`;
     }
@@ -744,6 +831,36 @@ export function formatGuardSummary(result: GuardResult): string {
   return `${lines.join("\n")}\n`;
 }
 
+/** Formats a reusable shard plan without exposing target inputs. */
+export function formatGuardShardPlanSummary(result: GuardShardPlanResult): string {
+  return `${[
+    "UIWitness Guard Shard Plan",
+    "",
+    `Run set: ${result.plan.runSetId}`,
+    `Coordinates: ${result.plan.coordinateIds.length}`,
+    `Shards: ${result.plan.shardCount}`,
+    `Largest shard: ${result.largestShard}`,
+    `Expires: ${result.plan.expiresAt}`,
+    `Plan: ${terminalText(result.planPath)}`,
+    ...(result.warning === undefined ? [] : [`Warning: ${terminalText(result.warning)}`]),
+    "Use this exact plan file for every shard.",
+  ].join("\n")}\n`;
+}
+
+/** Formats a complete partial bundle while reserving verdicts for T12 merge. */
+export function formatGuardShardSummary(result: GuardShardResult): string {
+  return `${[
+    "UIWitness Guard Shard",
+    "",
+    `Shard: ${result.shardIndex}/${result.shardCount}`,
+    `Run set: ${result.runSetId}`,
+    `Executions: ${result.total}`,
+    `Recorded failures: ${result.failed}`,
+    `Bundle: ${terminalText(result.bundlePath)}`,
+    "Bundle complete. T12 will add `uiwitness guard merge` for the final contract verdict.",
+  ].join("\n")}\n`;
+}
+
 function expectedScanError(error: unknown): string | undefined {
   if (
     error instanceof ConfigDiscoveryError ||
@@ -761,7 +878,8 @@ function validationError(error: unknown): string | undefined {
     !(error instanceof ContractProposalValidationError) &&
     !(error instanceof ContractValidationError) &&
     !(error instanceof GenerationValidationError) &&
-    !(error instanceof ResultValidationError)
+    !(error instanceof ResultValidationError) &&
+    !(error instanceof ShardValidationError)
   ) {
     return undefined;
   }
@@ -857,7 +975,36 @@ export async function runCli(options: RunCliOptions = {}): Promise<CliExitCode> 
       return 2;
     }
     try {
-      const result = await guardProject({ cwd: options.cwd, ...parsed });
+      if (parsed.command === "shard-plan") {
+        const result = await createGuardShardPlan({
+          configPath: parsed.configPath,
+          contractPath: parsed.contractPath,
+          cwd: options.cwd,
+          environmentId: parsed.environmentId,
+          outPath: parsed.outPath,
+          shards: parsed.shards,
+          ttlMinutes: parsed.ttlMinutes,
+        });
+        stdout(formatGuardShardPlanSummary(result));
+        return 0;
+      }
+      if (parsed.command === "shard") {
+        const result = await runGuardShard({
+          configPath: parsed.configPath,
+          contractPath: parsed.contractPath,
+          cwd: options.cwd,
+          shard: parsed.shard,
+          shardPlanPath: parsed.shardPlanPath,
+        });
+        stdout(formatGuardShardSummary(result));
+        return 0;
+      }
+      const result = await guardProject({
+        configPath: parsed.configPath,
+        contractPath: parsed.contractPath,
+        cwd: options.cwd,
+        jsonPath: parsed.jsonPath,
+      });
       stdout(formatGuardSummary(result));
       return result.comparison.verdict === "passed"
         ? 0

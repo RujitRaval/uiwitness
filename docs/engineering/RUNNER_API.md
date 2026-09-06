@@ -321,9 +321,15 @@ The runner digests staged bytes, validates generation-manifest schema v2 with on
 
 This API does not discover configuration, print terminal output, choose exit codes, or open a report. It delegates browser-independent HTML rendering to `uiwitness-report` so all generated output can share one publication transaction.
 
+## Immutable shard bundles
+
+`runShardScenarioCells(cells, options)` verifies that the supplied cells exactly equal one plan assignment, evaluates plan freshness before browser work, and returns a validated partial report plus its immutable bundle manifest/path. Empty assignments produce valid zero-execution reports without launching Chromium. Captures use the same scenario, diagnostic, mask, and retention logic as complete runs.
+
+Shard publication is deliberately separate from complete generation persistence. It exclusively creates `.uiwitness/shards/<runSetId>/<n>-of-<m>/`, stores retained PNG bytes under `evidence/artifacts/`, writes `report.json`, and records every byte count and SHA-256 digest in canonical `manifest.json`. The manifest is written and fsynced last as the bundle commit marker. A path collision is `SHARD_BUNDLE_EXISTS`; unsafe boundaries and publication failures reject without overwriting. Shards do not acquire `.runner-persistence-lock`, update `.uiwitness/generation.json`, or mutate `.uiwitness/report/`. Aggregation and final publication remain T12.
+
 ## Current boundary
 
-Phase 3 and State Contract Guard T5/T9/T10 are complete. The runner owns browser reuse, per-cell isolation, once-per-run memory-only authentication, scenarios/hooks, viewport/theme, navigation/readiness, fail-closed masked screenshot capture, retention, sanitized diagnostics, assertions, failure policies, core result translation, and crash-recoverable generation persistence. The CLI consumes this API through `scan`, `check`, and `guard`; the report package remains a pure validated v1/v2 renderer, and contract comparison remains core-owned.
+Phase 3 and State Contract Guard T5/T9/T10/T11 are complete. The runner owns browser reuse, per-cell isolation, once-per-run memory-only authentication, scenarios/hooks, viewport/theme, navigation/readiness, fail-closed masked screenshot capture, retention, sanitized diagnostics, assertions, failure policies, core result translation, crash-recoverable generation persistence, and isolated immutable shard bundles. The CLI consumes this API through `scan`, `check`, and `guard`; the report package remains a pure validated v1/v2 renderer, and contract comparison/shard contracts remain core-owned.
 
 ## Dependency decision
 

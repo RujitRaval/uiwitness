@@ -37,3 +37,15 @@ export type {
   ScanOptions,
   ScanResult,
 } from "./scan.js";
+export {
+  createGuardShardPlan,
+  runGuardShard,
+} from "./guard-shard.js";
+export type {
+  GuardShardOptions,
+  GuardShardPlanOptions,
+  GuardShardPlanResult,
+  GuardShardResult,
+} from "./guard-shard.js";
+export { GuardError } from "./guard-errors.js";
+export type { GuardErrorCode } from "./guard-errors.js";

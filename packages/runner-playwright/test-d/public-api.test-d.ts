@@ -11,6 +11,8 @@ import {
   runPublicSiteChecks,
   runScenarioCells,
   runScenarioLifecycle,
+  runShardScenarioCells,
+  ShardBundleError,
   withGenerationTransactionLock,
   publicSiteScenario,
   ScenarioLoadError,
@@ -50,6 +52,8 @@ import {
   type RunPersistedScenarioCellsOptions,
   type RunPublicSiteChecksOptions,
   type RunScenarioCellsOptions,
+  type RunShardScenarioCellsOptions,
+  type ShardScenarioRun,
   type ScenarioCellExecutor,
   type ScenarioContext,
   type ScenarioCaptureEvidence,
@@ -59,7 +63,7 @@ import {
   type UIWitnessScenario,
   type PublicRouteDiscoveryErrorCode,
 } from "uiwitness-runner-playwright";
-import type { UIWitnessReport } from "uiwitness-core";
+import type { UIWitnessReport, UIWitnessShardPlan } from "uiwitness-core";
 
 const authSetup: AuthSetup = async (context: AuthSetupContext) => {
   void context.context;
@@ -199,6 +203,19 @@ const persistenceOptions: RunPersistedScenarioCellsOptions = {
 };
 const persistedRun: Promise<PersistedScenarioRun> =
   runPersistedScenarioCells([execution.cell], persistenceOptions);
+declare const shardPlan: UIWitnessShardPlan;
+const shardOptions: RunShardScenarioCellsOptions = {
+  ...captureOptions,
+  plan: shardPlan,
+  projectDirectory: process.cwd(),
+  shardIndex: 1,
+};
+const shardRun: Promise<ShardScenarioRun> =
+  runShardScenarioCells([execution.cell], shardOptions);
+const shardBundleError: Error = new ShardBundleError(
+  "SHARD_BUNDLE_EXISTS",
+  "Bundle exists.",
+);
 const lockedGenerationMutation: Promise<string> = withGenerationTransactionLock(
   process.cwd(),
   async () => "locked",
@@ -295,6 +312,8 @@ void captureOutcomes;
 void loadedScenario;
 void persistedRun;
 void publicSiteRun;
+void shardRun;
+void shardBundleError;
 void navigation;
 void navigationOutcomes;
 void scenarioOutcomes;

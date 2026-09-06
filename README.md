@@ -219,7 +219,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). The [Quick Check guide](docs/open
 
 ## Roadmap
 
-The current release is the local-first v0.1 product: explicit matrices, deterministic Playwright scenarios, offline evidence, CI usage, a complete example, the completed [public URL Quick Check](docs/designs/public-url-quick-check.md), and T1–T10 of the approved [State Contract Guard roadmap](docs/designs/uiwitness-state-contract-guard.md), through memory-only authentication and fail-closed evidence privacy. Deterministic sharding and its aggregation/release-proof slices remain sequenced roadmap work. Hosted collaboration remains out of scope unless real demand appears.
+The current release is the local-first v0.1 product: explicit matrices, deterministic Playwright scenarios, offline evidence, CI usage, a complete example, the completed [public URL Quick Check](docs/designs/public-url-quick-check.md), and T1–T11 of the approved [State Contract Guard roadmap](docs/designs/uiwitness-state-contract-guard.md), through nonce-bound deterministic shard plans and immutable partial bundles. Aggregation and its documentation/release-proof slices remain sequenced roadmap work. Hosted collaboration remains out of scope unless real demand appears.
 
 ## License
 
