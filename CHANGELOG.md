@@ -4,6 +4,24 @@ All notable changes to UIWitness will be documented in this file.
 
 This project uses the four-part version format required by the GStack ship workflow.
 
+## [0.26.10.0] - 2026-09-05
+
+### Added
+
+- Teams can now create nonce-bound, expiring shard plans from the complete current State Contract Guard inventory and distribute exact `N/M` assignments without a coordinator service.
+- Shard workers can execute their assigned cells and publish immutable, checksummed partial bundles—including valid empty shards—without writing a final verdict or taking the normal guard lock.
+- Core, CLI, and Playwright runner packages now expose validated shard-plan, assignment, bundle-manifest, and orchestration APIs with documented stable errors.
+
+### Changed
+
+- Shard planning computes distribution summaries in one pass and warns when the largest assignment exceeds 1.5× the mean; automatic rebalancing remains intentionally disabled.
+- Project guidance and engineering references now mark T11 complete while keeping bundle aggregation and final verdict generation isolated to T12.
+
+### Security
+
+- Shard execution fails closed before browser work on authentication, expiry, target/config/contract/schema drift, malformed plans, unsafe output paths, or existing immutable bundle destinations.
+- Bundle publication validates exact coordinate ownership, confines evidence beneath private no-follow directories, fsyncs content before writing the manifest commit marker, and never removes a bundle after that marker is visible.
+
 ## [0.26.9.0] - 2026-09-05
 
 ### Added
