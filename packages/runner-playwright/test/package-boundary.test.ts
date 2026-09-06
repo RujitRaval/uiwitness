@@ -75,6 +75,7 @@ describe("uiwitness-runner-playwright package boundary", () => {
       "withGenerationTransactionLock",
       "runShardScenarioCells",
       "ShardBundleError",
+      "mergeShardScenarioBundles",
       "loadScenario",
       "runScenarioCells",
       "runScenarioLifecycle",

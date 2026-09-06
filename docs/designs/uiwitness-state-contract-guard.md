@@ -1001,7 +1001,7 @@ Synthesized from this review's findings. Execute in order; each item ships throu
   - Surfaced by: D15, D21, D26 and Section 7 — shards must use the complete current config and cannot mix runs or authenticated shared accounts.
   - Files: core shard schemas/hash vectors, CLI plan/shard commands, runner bundle publisher, tests.
   - Verify: every `N/M`, nonce/target/TTL, additions absent from contract, empty shards, no-clobber paths, distribution benchmark.
-- [ ] **T12 (P1, human: ~4 days / Codex: ~6h)** — CLI/Runner — Implement fail-closed aggregation and deterministic publication
+- [x] **T12 (P1, human: ~4 days / Codex: ~6h)** — CLI/Runner — Implement fail-closed aggregation and deterministic publication
   - Surfaced by: Sections 1, 2, and 7 — merge must validate completeness before comparison and produce normalized equivalence independent of arrival order.
   - Files: merge modules, generation transaction integration, Action matrix example, fault/equivalence tests.
   - Verify: missing/duplicate/overlap/checksum/version/target/expiry failures and byte-equivalent normalized output.

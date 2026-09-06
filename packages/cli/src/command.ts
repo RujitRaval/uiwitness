@@ -48,6 +48,10 @@ import {
   type GuardShardPlanResult,
   type GuardShardResult,
 } from "./guard-shard.js";
+import {
+  mergeGuardShards,
+  type GuardMergeResult,
+} from "./guard-merge.js";
 import { OpenReportError, openReport } from "./open.js";
 import { ScanError, scanProject, type ScanResult } from "./scan.js";
 
@@ -60,6 +64,7 @@ Usage:
   uiwitness guard [--config <path>] [--contract <path>] [--json <path>]
   uiwitness guard shard-plan --shards <M> --out <path> [--config <path>] [--contract <path>] [--environment-id <id>] [--ttl <5m-1440m>]
   uiwitness guard --shard <N/M> --shard-plan <path> [--config <path>] [--contract <path>]
+  uiwitness guard merge --input <shard-bundle>... [--config <path>] [--contract <path>]
   uiwitness contract init [--config <path>] [--contract <path>]
   uiwitness contract inspect --candidate <path> --change <id>
   uiwitness contract annotate --candidate <path> --change <id> --owner <text> --reason <text> --created-on <date> --expires-on <date>
@@ -121,6 +126,12 @@ type ParsedGuardArguments =
       readonly configPath?: string | undefined;
       readonly contractPath?: string | undefined;
       readonly jsonPath?: string | undefined;
+    }
+  | {
+      readonly command: "merge";
+      readonly configPath?: string | undefined;
+      readonly contractPath?: string | undefined;
+      readonly inputs: readonly string[];
     }
   | {
       readonly command: "shard";
@@ -243,6 +254,26 @@ function parseScanArguments(
 function parseGuardArguments(
   args: readonly string[],
 ): ParsedGuardArguments | string {
+  if (args[0] === "merge") {
+    const parsed = parseNamedOptions(
+      args.slice(1),
+      new Set(["--config", "--contract", "--input"]),
+      new Set(["--input"]),
+      "guard merge",
+    );
+    if (typeof parsed === "string") return parsed;
+    const inputs = parsed.get("--input") ?? [];
+    if (inputs.length === 0) return "The guard merge command requires at least one --input bundle.";
+    if (inputs.length > 10_000) return "The guard merge command accepts at most 10000 --input bundles.";
+    const configPath = optionValue(parsed, "--config");
+    const contractPath = optionValue(parsed, "--contract");
+    return Object.freeze({
+      command: "merge" as const,
+      ...(configPath === undefined ? {} : { configPath }),
+      ...(contractPath === undefined ? {} : { contractPath }),
+      inputs: Object.freeze([...inputs]),
+    });
+  }
   if (args[0] === "shard-plan") {
     const parsed = parseNamedOptions(
       args.slice(1),
@@ -847,7 +878,7 @@ export function formatGuardShardPlanSummary(result: GuardShardPlanResult): strin
   ].join("\n")}\n`;
 }
 
-/** Formats a complete partial bundle while reserving verdicts for T12 merge. */
+/** Formats a complete partial bundle while reserving verdicts for merge. */
 export function formatGuardShardSummary(result: GuardShardResult): string {
   return `${[
     "UIWitness Guard Shard",
@@ -857,8 +888,20 @@ export function formatGuardShardSummary(result: GuardShardResult): string {
     `Executions: ${result.total}`,
     `Recorded failures: ${result.failed}`,
     `Bundle: ${terminalText(result.bundlePath)}`,
-    "Bundle complete. T12 will add `uiwitness guard merge` for the final contract verdict.",
+    "Bundle complete. Run `uiwitness guard merge --input <bundle>...` only after every shard finishes.",
   ].join("\n")}\n`;
+}
+
+/** Formats the run-set identity before the ordinary final guard verdict. */
+export function formatGuardMergeSummary(result: GuardMergeResult): string {
+  return `${[
+    "UIWitness Guard Merge",
+    "",
+    `Run set: ${result.runSetId}`,
+    `Shards: ${result.shardCount}`,
+    `Inputs: ${result.inputCount}`,
+    "",
+  ].join("\n")}${formatGuardSummary(result)}`;
 }
 
 function expectedScanError(error: unknown): string | undefined {
@@ -987,6 +1030,18 @@ export async function runCli(options: RunCliOptions = {}): Promise<CliExitCode> 
         });
         stdout(formatGuardShardPlanSummary(result));
         return 0;
+      }
+      if (parsed.command === "merge") {
+        const result = await mergeGuardShards({
+          configPath: parsed.configPath,
+          contractPath: parsed.contractPath,
+          cwd: options.cwd,
+          inputs: parsed.inputs,
+        });
+        stdout(formatGuardMergeSummary(result));
+        return result.comparison.verdict === "passed"
+          ? 0
+          : result.comparison.verdict === "failed" ? 1 : 2;
       }
       if (parsed.command === "shard") {
         const result = await runGuardShard({

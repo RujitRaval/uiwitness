@@ -1,0 +1,102 @@
+name: UIWitness sharded guard
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.20.0
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install uiwitness guard shard-plan --shards 4 --out uiwitness-shard-plan.json --ttl 60m
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: uiwitness-shard-plan
+          path: uiwitness-shard-plan.json
+          if-no-files-found: error
+          retention-days: 1
+
+  shard:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.20.0
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install playwright install --with-deps chromium
+      - run: npm run build
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: uiwitness-shard-plan
+          path: .
+      - name: Start application
+        run: |
+          npm run start > "$RUNNER_TEMP/uiwitness-app.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/uiwitness-app.pid"
+      - name: Wait for application
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Run immutable shard
+        id: shard
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+        run: |
+          npx --no-install uiwitness guard --shard "$SHARD_INDEX/4" --shard-plan uiwitness-shard-plan.json
+          RUN_SET_ID=$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync("uiwitness-shard-plan.json", "utf8")).runSetId)')
+          echo "run-set-id=$RUN_SET_ID" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/uiwitness-bundle-root/$RUN_SET_ID"
+          cp -R ".uiwitness/shards/$RUN_SET_ID/$SHARD_INDEX-of-4" "$RUNNER_TEMP/uiwitness-bundle-root/$RUN_SET_ID/"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: uiwitness-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/uiwitness-bundle-root
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.20.0
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: uiwitness-shard-*
+          path: shard-inputs
+          merge-multiple: true
+      - name: Validate, merge, compare, and publish final truth
+        shell: bash
+        run: |
+          args=()
+          while IFS= read -r -d '' bundle; do
+            args+=(--input "$bundle")
+          done < <(find shard-inputs -mindepth 2 -maxdepth 2 -type d -name '*-of-4' -print0)
+          npx --no-install uiwitness guard merge "${args[@]}"

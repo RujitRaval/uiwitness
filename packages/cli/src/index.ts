@@ -41,6 +41,8 @@ export {
   createGuardShardPlan,
   runGuardShard,
 } from "./guard-shard.js";
+export { mergeGuardShards } from "./guard-merge.js";
+export type { GuardMergeOptions, GuardMergeResult } from "./guard-merge.js";
 export type {
   GuardShardOptions,
   GuardShardPlanOptions,

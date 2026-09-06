@@ -11,7 +11,7 @@ import {
 import { ShardValidationError } from "./errors.js";
 
 export const SHARD_PLAN_SCHEMA_VERSION = 1 as const;
-export const SHARD_BUNDLE_MANIFEST_SCHEMA_VERSION = 1 as const;
+export const SHARD_BUNDLE_MANIFEST_SCHEMA_VERSION = 2 as const;
 export const SHARD_ASSIGNMENT_ALGORITHM = "sha256-uint64be-mod-v1" as const;
 export const SHARD_TARGET_DIGEST_ALGORITHM = "jcs-rfc8785+shard-target-v1" as const;
 export const SHARD_TTL_MINUTES_DEFAULT = 60 as const;
@@ -45,12 +45,27 @@ export interface ShardBundleFile {
   readonly role: "evidence" | "report";
 }
 
+export interface ShardBundleEvidenceMask {
+  readonly cardinalities: readonly number[];
+  readonly id: string;
+}
+
+/** Privacy-safe capture totals needed to reproduce the final evidence manifest. */
+export interface ShardBundleEvidence {
+  readonly attempted: number;
+  readonly captured: number;
+  readonly masks: readonly ShardBundleEvidenceMask[];
+  readonly omitted: number;
+  readonly retention: "all" | "failures-only" | "none";
+}
+
 export interface UIWitnessShardBundleManifest {
   readonly assignedCoordinateIds: readonly string[];
   readonly assignmentAlgorithm: typeof SHARD_ASSIGNMENT_ALGORITHM;
   readonly configDigest: Sha256Digest;
   readonly contractDigest: Sha256Digest;
   readonly createdAt: string;
+  readonly evidence: ShardBundleEvidence;
   readonly environmentId: string;
   readonly evaluatedOn: string;
   readonly executedCoordinateIds: readonly string[];
@@ -130,12 +145,24 @@ const fileSchema = z.strictObject({
   role: z.enum(["evidence", "report"]),
 });
 
+const bundleEvidenceSchema = z.strictObject({
+  attempted: z.number().int().nonnegative(),
+  captured: z.number().int().nonnegative(),
+  masks: z.array(z.strictObject({
+    cardinalities: z.array(z.number().int().nonnegative()).min(1).max(SHARD_COORDINATE_LIMIT),
+    id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
+  })).max(SHARD_COORDINATE_LIMIT),
+  omitted: z.number().int().nonnegative(),
+  retention: z.enum(["all", "failures-only", "none"]),
+});
+
 const bundleManifestSchema = z.strictObject({
   assignedCoordinateIds: z.array(coordinateIdSchema).max(SHARD_COORDINATE_LIMIT),
   assignmentAlgorithm: z.literal(SHARD_ASSIGNMENT_ALGORITHM),
   configDigest: digestSchema,
   contractDigest: digestSchema,
   createdAt: canonicalTimestampSchema,
+  evidence: bundleEvidenceSchema,
   environmentId: environmentIdSchema,
   evaluatedOn: evaluatedOnSchema,
   executedCoordinateIds: z.array(coordinateIdSchema).max(SHARD_COORDINATE_LIMIT),
@@ -393,6 +420,41 @@ function validateManifestInvariants(manifest: UIWitnessShardBundleManifest): UIW
     role === "evidence" && !path.startsWith("evidence/artifacts/")
   )) {
     return invalid("Shard evidence checksums must stay beneath evidence/artifacts/.", "$.files");
+  }
+  if (
+    manifest.evidence.captured > manifest.evidence.attempted ||
+    manifest.evidence.attempted > manifest.executedCoordinateIds.length ||
+    manifest.evidence.captured + manifest.evidence.omitted !== manifest.executedCoordinateIds.length
+  ) {
+    return invalid("Shard evidence totals must exactly account for the executed coordinates.", "$.evidence");
+  }
+  if (manifest.evidence.masks.some(({ cardinalities }) =>
+    cardinalities.length > manifest.evidence.attempted
+  )) {
+    return invalid("Each shard mask summary must fit within the attempted capture count.", "$.evidence.masks");
+  }
+  if (manifest.files.filter(({ role }) => role === "evidence").length !== manifest.evidence.captured) {
+    return invalid("Shard evidence checksums must exactly match the retained capture count.", "$.files");
+  }
+  if (
+    (manifest.reportSchemaVersion === 1 && manifest.evidence.retention !== "all") ||
+    (manifest.reportSchemaVersion === 2 && manifest.evidence.retention === "all")
+  ) {
+    return invalid("Shard evidence retention must match the report schema version.", "$.evidence.retention");
+  }
+  if (
+    manifest.evidence.retention === "none" &&
+    (manifest.evidence.attempted !== 0 || manifest.evidence.captured !== 0 || manifest.evidence.masks.length !== 0)
+  ) {
+    return invalid("Retention 'none' cannot attempt, retain, or mask screenshots.", "$.evidence.retention");
+  }
+  if (manifest.evidence.masks.some((mask, index) =>
+    (index > 0 && manifest.evidence.masks[index - 1]!.id >= mask.id) ||
+    mask.cardinalities.some((value, valueIndex) =>
+      valueIndex > 0 && mask.cardinalities[valueIndex - 1]! > value
+    )
+  )) {
+    return invalid("Shard evidence masks must use unique canonical ID and cardinality order.", "$.evidence.masks", "duplicate");
   }
   const ttlMinutes = (Date.parse(manifest.expiresAt) - Date.parse(manifest.createdAt)) / 60_000;
   if (

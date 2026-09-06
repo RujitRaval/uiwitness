@@ -28,7 +28,7 @@ import {
 
 `contractExceptionLifecycle(exception, evaluatedOn)` returns the deterministic active or expired state and signed days until expiry using the same UTC calendar boundary as contract comparison.
 
-Shard plans use exact canonical JSON, a nonce-bound run-set ID, a bounded UTC lifetime, normalized target/config/contract identities, and fixed SHA-256/uint64be modulo assignment. Bundle manifests bind complete per-shard coordinate execution, report/evidence checksums, and the exact source plan for future T12 aggregation.
+Shard plans use exact canonical JSON, a nonce-bound run-set ID, a bounded UTC lifetime, normalized target/config/contract identities, and fixed SHA-256/uint64be modulo assignment. Bundle-manifest v2 binds complete per-shard coordinate execution, report/evidence checksums, the exact source plan, and privacy-safe capture totals used by fail-closed aggregation.
 
 `parseConfig` accepts strict shared-read-only authentication boundaries. `validateAuthenticationStorageState` enforces their exact local-storage origin and cookie domain/path/secure/partition scope without exposing secret values in errors.
 

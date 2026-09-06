@@ -2,11 +2,15 @@ import { createShardPlan, shardTargetDigest } from "uiwitness-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createGuardShardPlanMock = vi.hoisted(() => vi.fn());
+const mergeGuardShardsMock = vi.hoisted(() => vi.fn());
 const runGuardShardMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../src/guard-shard.js", () => ({
   createGuardShardPlan: createGuardShardPlanMock,
   runGuardShard: runGuardShardMock,
+}));
+vi.mock("../src/guard-merge.js", () => ({
+  mergeGuardShards: mergeGuardShardsMock,
 }));
 
 import { runCli } from "../src/command.js";
@@ -29,6 +33,7 @@ const plan = createShardPlan({
 
 beforeEach(() => {
   createGuardShardPlanMock.mockReset();
+  mergeGuardShardsMock.mockReset();
   runGuardShardMock.mockReset();
 });
 
@@ -90,7 +95,43 @@ describe("guard shard commands", () => {
       shardPlanPath: ".uiwitness/plan.json",
     }));
     expect(stdout.join("")).toContain("Recorded failures: 2");
-    expect(stdout.join("")).toContain("T12 will add `uiwitness guard merge`");
+    expect(stdout.join("")).toContain("Run `uiwitness guard merge --input <bundle>...`");
+  });
+
+  it("accepts repeated merge inputs and returns the authoritative final verdict", async () => {
+    mergeGuardShardsMock.mockResolvedValue({
+      comparison: { evaluatedOn: "2026-09-05", findings: [], verdict: "passed" },
+      configPath: "/project/uiwitness.config.mjs",
+      contractPath: "/project/uiwitness.contract.json",
+      inputCount: 2,
+      machineVerdict: { findings: [] },
+      report: {},
+      runSetId: plan.runSetId,
+      shardCount: 2,
+      verdictPath: ".uiwitness/contract-verdict.json",
+    });
+    const stdout: string[] = [];
+    const exit = await runCli({
+      args: [
+        "guard", "merge",
+        "--input", `.uiwitness/shards/${plan.runSetId}/2-of-2`,
+        "--input", `.uiwitness/shards/${plan.runSetId}/1-of-2`,
+        "--config", "config/uiwitness.mts",
+      ],
+      cwd: "/project",
+      stdout: (value) => stdout.push(value),
+    });
+
+    expect(exit).toBe(0);
+    expect(mergeGuardShardsMock).toHaveBeenCalledWith(expect.objectContaining({
+      configPath: "config/uiwitness.mts",
+      inputs: [
+        `.uiwitness/shards/${plan.runSetId}/2-of-2`,
+        `.uiwitness/shards/${plan.runSetId}/1-of-2`,
+      ],
+    }));
+    expect(stdout.join("")).toContain("UIWitness Guard Merge");
+    expect(stdout.join("")).toContain("Verdict: PROMISE KEPT");
   });
 
   it("rejects incomplete or malformed shard options before execution", async () => {
@@ -100,14 +141,17 @@ describe("guard shard commands", () => {
       ["guard", "--shard", "01/02", "--shard-plan", "plan.json"],
       ["guard", "shard-plan", "--shards", "0", "--out", "plan.json"],
       ["guard", "shard-plan", "--shards", "2", "--out", "plan.json", "--ttl", "5h"],
+      ["guard", "merge"],
     ]) {
       expect(await runCli({ args, stderr: (value) => errors.push(value) })).toBe(2);
     }
     expect(createGuardShardPlanMock).not.toHaveBeenCalled();
     expect(runGuardShardMock).not.toHaveBeenCalled();
+    expect(mergeGuardShardsMock).not.toHaveBeenCalled();
     expect(errors.join("\n")).toContain("must be provided together");
     expect(errors.join("\n")).toContain("exact one-based N/M form");
     expect(errors.join("\n")).toContain("whole number from 1 through 10000");
     expect(errors.join("\n")).toContain("whole minutes from 5m through 1440m");
+    expect(errors.join("\n")).toContain("requires at least one --input bundle");
   });
 });
