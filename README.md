@@ -190,7 +190,7 @@ All four packages publish from the protected GitHub Release workflow through npm
 ## Local-first architecture
 
 ```text
-configure → expand matrix → run isolated browser cells → compare contract → commit one evidence/verdict/proposal generation → inspect
+configure → expand matrix → run isolated browser cells → compare contract → commit one evidence/verdict/proposal generation → inspect → repair or accept named changes → rerun
 ```
 
 - No telemetry, hosted backend, database, account, cloud dependency, or required LLM.

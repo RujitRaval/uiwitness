@@ -32,10 +32,11 @@ test("State Contract Guard guide uses the shipped executable grammar", async () 
 });
 
 test("State Contract Guard documentation preserves safety and roadmap boundaries", async () => {
-  const [guide, architecture, roadmap] = await Promise.all([
+  const [guide, architecture, roadmap, readme] = await Promise.all([
     read("docs/open-source/STATE_CONTRACT_GUARD.md"),
     read("docs/architecture/STATE_CONTRACT_GUARD.md"),
     read("docs/designs/uiwitness-state-contract-guard.md"),
+    read("README.md"),
   ]);
 
   for (const phrase of [
@@ -63,4 +64,8 @@ test("State Contract Guard documentation preserves safety and roadmap boundaries
 
   assert.match(roadmap, /- \[x\] \*\*T13/u);
   assert.match(roadmap, /- \[ \] \*\*T14/u);
+  assert.match(
+    readme,
+    /compare contract → commit one evidence\/verdict\/proposal generation → inspect → repair or accept named changes → rerun/u,
+  );
 });
