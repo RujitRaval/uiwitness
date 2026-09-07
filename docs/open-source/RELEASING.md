@@ -44,6 +44,8 @@ Release CI packs once on Node 24 in an OIDC-free job, repeats the consumer and c
 node scripts/release-package-smoke.mjs --input /absolute/path/to/tarballs --action-sha <40-character-commit>
 ```
 
+[ADR 0042](../decisions/0042-release-artifact-identity-proof.md) records the package, Action, OIDC, and provenance identity boundaries behind this release flow.
+
 After npm publication, repeat the exact live-registry Quick Check journey for the released version:
 
 ```bash
