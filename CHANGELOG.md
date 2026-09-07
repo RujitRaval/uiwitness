@@ -4,6 +4,25 @@ All notable changes to UIWitness will be documented in this file.
 
 This project uses the four-part version format required by the GStack ship workflow.
 
+## [0.26.13.0] - 2026-09-07
+
+### Added
+
+- Release smoke now installs the exact four packed npm artifacts in a CommonJS consumer, executes the complete reviewed composite Action contract at the matching full commit SHA, and proves direct-CLI parity for both passing and seeded-regression guards.
+- A release-bound manifest records the exact package set, byte counts, SHA-512 digests, package version, Action SHA, tag, and commit before the artifact bundle crosses into the protected publisher.
+- Post-publication verification now cryptographically verifies npm registry signatures and Sigstore provenance, requires GitHub's OIDC issuer and the exact repository workflow/tag certificate identity, and binds every package subject and integrity digest to the release commit.
+
+### Changed
+
+- Pull-request and release CI exercise packed consumers on Node 22 and Node 24; release CI packs only once and reuses the same tarball bytes across both runtimes.
+- The normal release path automatically gates both Node lines on provenance followed by the registry-only `check` → promotion → `scan` → `open` journey, with bounded retries for incomplete registry propagation.
+- State Contract Guard roadmap, architecture, security, testing, release, Action, product, and operator guidance now mark T14 complete and require a newly approved roadmap slice for future work.
+
+### Security
+
+- Dependency installation, browser execution, tests, and packing now run in an OIDC-free preparation job. Only a minimal protected job can mint the publication identity, and it installs no dependencies or browser before verifying and publishing the prepared artifact manifest.
+- Release validation rejects changed package bytes, package-set drift, mismatched tag/commit/Action identities, unsigned or incorrectly signed attestations, unexpected Action metadata or steps, and provenance from any other issuer, repository workflow, or tag.
+
 ## [0.26.12.0] - 2026-09-06
 
 ### Added
