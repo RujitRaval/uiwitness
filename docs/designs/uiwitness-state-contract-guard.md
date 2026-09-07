@@ -1005,7 +1005,7 @@ Synthesized from this review's findings. Execute in order; each item ships throu
   - Surfaced by: Sections 1, 2, and 7 — merge must validate completeness before comparison and produce normalized equivalence independent of arrival order.
   - Files: merge modules, generation transaction integration, Action matrix example, fault/equivalence tests.
   - Verify: missing/duplicate/overlap/checksum/version/target/expiry failures and byte-equivalent normalized output.
-- [ ] **T13 (P2, human: ~3 days / Codex: ~4h)** — Documentation — Update architecture, security, CLI, UX, Action, migration, and diagrams
+- [x] **T13 (P2, human: ~3 days / Codex: ~4h)** — Documentation — Update architecture, security, CLI, UX, Action, migration, and diagrams
   - Surfaced by: Stale Diagram Audit and every compatibility/security decision.
   - Files: `README.md`, `docs/architecture/ARCHITECTURE.md`, `docs/engineering/{IMPLEMENTATION_PLAN,TEST_STRATEGY,SECURITY_PRIVACY,CLI_API}.md`, product/open-source docs.
   - Verify: `node scripts/check-docs.mjs`, brand/link checks, examples match exact shipped CLI and schemas.

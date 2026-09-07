@@ -93,6 +93,16 @@ After validating every input and output boundary, guard runs the complete unfilt
 
 A matching complete contract exits `0`, including exact active known failures. A complete run with a regression, recovery, expired exception, or unaccepted matrix/config drift exits `1` and publishes an immutable content-addressed proposal with a separate metadata overlay. Invalid input, unsafe output, setup failure, incomplete execution, or an internal error exits `2`. Report, evidence, verdict, proposal family, and generation metadata publish in one crash-recoverable transaction.
 
+For a large unauthenticated matrix, the three sharding forms are:
+
+```bash
+uiwitness guard shard-plan --shards <M> --out <path> [--config <path>] [--contract <path>] [--environment-id <id>] [--ttl <5m-1440m>]
+uiwitness guard --shard <N/M> --shard-plan <path> [--config <path>] [--contract <path>]
+uiwitness guard merge --input <shard-bundle>... [--config <path>] [--contract <path>]
+```
+
+The coordinator plan binds a fresh nonce, target, complete current inventory, config, contract, report schema, tool version, and expiry. Each worker writes one immutable checksum-bound bundle and no final verdict. Merge accepts every explicit bundle in any arrival order, validates exact `1..M` completeness and common identity, normalizes executions into configuration order, and alone publishes the final generation. Authentication is rejected at plan, shard, and merge boundaries.
+
 ### `uiwitness contract`
 
 ```bash
@@ -103,6 +113,20 @@ uiwitness contract accept --candidate <path> --change <id>... [--config <path>] 
 ```
 
 `contract init` performs one complete run and exclusively creates the first contract only when every coordinate passes. Failures publish a proposal instead. Proposal IDs are stable `<operation>:<route/state/viewport/theme>` values where operation is `add`, `remove`, `config`, `expectation`, or `exception`. `inspect` shows exactly one named change. `annotate` writes only owner, reason, creation date, and a 1–30 day expiry to the proposal's separate metadata overlay; only changes that can create or renew a failed expectation accept metadata.
+
+The first-contract flow is separate from ordinary `uiwitness init`:
+
+```text
+uiwitness.config.mts + uiwitness/scenarios/**
+                    │
+                    ▼
+          uiwitness contract init
+              │             │
+          all pass       any failure
+              │             │
+              ▼             ▼
+uiwitness.contract.json   .uiwitness/contract-candidates/<digest>.proposal.json
+```
 
 `accept` takes one or more explicit `--change` selections. Under a contract writer lock it verifies the content-addressed filename, regenerates the proposal from its immutable source, checks current contract and expanded-config digests, revalidates exception dates, and applies only selected changes. Success safely replaces an existing contract or exclusively creates the first one, consumes the proposal and metadata, reports unselected IDs as discarded, and never renews an exception implicitly. Concurrent writers, stale inputs, mutated proposals, unsafe paths, empty selection, and missing metadata fail with exit `2` without changing the contract.
 
@@ -116,3 +140,5 @@ The command accepts no flags or positional arguments. It opens only the fixed HT
 
 ## Coverage
 Every `route x state x viewport x theme` is an expected cell. Only configured states count; v0.1 never claims an unconfigured state is missing.
+
+The [State Contract Guard guide](../open-source/STATE_CONTRACT_GUARD.md) combines these commands into the complete local, CI, exception, privacy, sharding, recovery, and compatibility workflow.

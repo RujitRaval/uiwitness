@@ -58,6 +58,17 @@ UIWitness does not rename, copy, upload, or delete existing `.statecraft/` evide
 
 5. Commit the renamed config and scenarios. Keep both `.uiwitness/` and `.statecraft/` ignored because either directory may contain screenshots, URLs, and diagnostics.
 
+## Adopt State Contract Guard after migration
+
+Identity migration does not create a contract or reinterpret old evidence. First complete the package, config, scenario, and command cutover above. Then run the current matrix, review it, and initialize a new UIWitness contract from a fresh complete run:
+
+```bash
+npx --no-install uiwitness scan
+npx --no-install uiwitness contract init
+```
+
+Commit `uiwitness.contract.json`; keep the generated proposal, verdict, report, and screenshots beneath ignored `.uiwitness/`. Existing legacy reports are evidence history, not valid contract-initialization input. See the [State Contract Guard guide](STATE_CONTRACT_GUARD.md) for named acceptance, known-failure expiry, Action adoption, privacy policies, and unauthenticated sharding.
+
 ## Existing evidence stays private
 
 Do not move `.statecraft/` to `.uiwitness/`. UIWitness treats the roots as separate evidence histories and never accesses the legacy directory during a new run. Existing schema-v1 JSON can still be parsed and rendered programmatically with the UIWitness core and report packages, including screenshot references rooted under `.statecraft/artifacts/`; `uiwitness open` intentionally opens only the latest `.uiwitness/report/index.html`.

@@ -2,6 +2,8 @@
 
 UIWitness may capture sensitive application screens.
 
+The task-oriented [State Contract Guard guide](../open-source/STATE_CONTRACT_GUARD.md) turns these controls into local, CI, authentication, evidence, sharding, and recovery procedures. The rules below remain the normative security boundary.
+
 - No telemetry in v0.1.
 - No automatic upload of screenshots, reports, URLs, diagnostics, or source data.
 - No external assets in generated reports.

@@ -1,5 +1,7 @@
 # uiwitness
 
+Use the [State Contract Guard guide](https://github.com/RujitRaval/uiwitness/blob/main/docs/open-source/STATE_CONTRACT_GUARD.md) for the complete install, contract, exception, CI, privacy, sharding, and recovery workflow.
+
 The npm package for the `uiwitness` CLI. UIWitness checks public websites or renders configured UI product states with Playwright, captures screenshots and diagnostics, and writes an offline coverage report.
 
 ```bash
