@@ -4,6 +4,13 @@ All notable changes to UIWitness will be documented in this file.
 
 This project uses the four-part version format required by the GStack ship workflow.
 
+## [0.26.15.0] - 2026-09-07
+
+### Added
+
+- CEOs, launch owners, prospective customers, and new repository visitors now have one evidence-backed report covering the product, delivered capabilities, known limitations, launch readiness, validation gates, operating risks, and the complete route from first public-site check to CI contract enforcement.
+- The README now links directly to the CEO report and customer launch playbook so GitHub visitors can find the product status, adoption paths, and launch instructions from the repository front door.
+
 ## [0.26.14.0] - 2026-09-07
 
 ### Changed

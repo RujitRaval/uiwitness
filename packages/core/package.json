@@ -1,6 +1,6 @@
 {
   "name": "uiwitness-core",
-  "version": "0.26.14",
+  "version": "0.26.15",
   "description": "Core contracts for UIWitness UI product-state coverage.",
   "license": "MIT",
   "repository": {

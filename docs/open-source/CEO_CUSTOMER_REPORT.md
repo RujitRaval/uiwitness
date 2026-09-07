@@ -3,7 +3,8 @@
 - **Status date:** September 7, 2026
 - **Repository:** [RujitRaval/uiwitness](https://github.com/RujitRaval/uiwitness)
 - **Current public release:** [`v0.26.13`](https://github.com/RujitRaval/uiwitness/releases/tag/v0.26.13) / npm `0.26.13`
-- **Current `main` version:** `0.26.14` reserved after recording the `v0.26.13` release proof
+- **Public `main` baseline at analysis:** `0.26.14` reserved after recording the `v0.26.13` release proof
+- **This report's release candidate:** `0.26.15`
 
 **Audience:** CEO/founder, launch owner, product and engineering leaders, prospective customers, design partners, and new repository visitors
 
@@ -411,7 +412,7 @@ The project moved from repository bootstrap to a distribution-proven contract sy
 | `0.25.5` | Completed external cutover and normal token-free OIDC release path |
 | `0.25.6` | Recorded the first normal post-bootstrap release proof |
 
-### 3.7 State Contract Guard — `0.26.0` through `0.26.14`
+### 3.7 State Contract Guard and launch reporting — `0.26.0` through `0.26.15`
 
 | Version | Delivered outcome |
 | --- | --- |
@@ -430,6 +431,7 @@ The project moved from repository bootstrap to a distribution-proven contract sy
 | `0.26.12` | Consolidated customer/operator guide, architecture diagrams, and documentation contract tests |
 | `0.26.13` | Exact package/Action release identity, Node 22/24 consumer proof, OIDC publication, and provenance verification |
 | `0.26.14` | Current `main` documentation state recording `v0.26.13` as the completed public proof; not yet a public npm release |
+| `0.26.15` | This CEO report, customer launch playbook, and README entry point; a release candidate until its pull request is merged and the protected release completes |
 
 ## 4. What is working?
 
@@ -462,7 +464,7 @@ The quality story is unusually complete for a pre-1.0 open-source tool:
 - Package smoke installs exact tarballs into an isolated CommonJS-default consumer and imports every public package surface.
 - Release smoke proves the package/Action pair for a pass and seeded regression.
 - Core contract parsing/digest/comparison is benchmarked at 10,000 coordinates under one second and 256 MiB additional RSS on both supported Node lines.
-- This report branch passed 808 Vitest cases, 123 Node script tests, documentation checks across 102 tracked documents, every package build/typecheck/lint gate, and the four-tarball `0.26.14` package consumer smoke.
+- This report branch passed 808 Vitest cases, 123 Node script tests, documentation checks across 102 tracked documents, every package build/typecheck/lint gate, and the four-tarball `0.26.15` package consumer smoke.
 - The latest `main` CI and CodeQL runs completed successfully.
 - The `v0.26.13` protected release completed every job: artifact preparation, npm publication, provenance verification, Node 22 registry journey, and Node 24 registry journey.
 - The npm registry exposes an attestation URL and SLSA provenance for `uiwitness@0.26.13`.
@@ -508,9 +510,9 @@ Mitigation: every launch message and example command should say that exit `1` wi
 
 ### 5.4 Current source is ahead of the public release
 
-`main` identifies itself as `0.26.14`, while npm and the latest GitHub Release are `0.26.13`. The `0.26.14` change records release proof and reserves the next version; it is not a missing product release.
+At the time of analysis, public `main` identified itself as `0.26.14`, while npm and the latest GitHub Release were `0.26.13`. The `0.26.14` change records release proof and is not a missing product release. This report is versioned as the `0.26.15` release candidate; that version is not public until its pull request is merged and the protected release succeeds.
 
-Mitigation: customer instructions should pin `0.26.13` until another protected release is deliberately created. Do not imply that `0.26.14` is available from npm.
+Mitigation: customer instructions should pin `0.26.13` until another protected release is deliberately created. Do not imply that `0.26.14` or `0.26.15` is available from npm before publication.
 
 ### 5.5 Some copy-ready Action examples still show `0.26.8`
 
