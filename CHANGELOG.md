@@ -4,6 +4,13 @@ All notable changes to UIWitness will be documented in this file.
 
 This project uses the four-part version format required by the GStack ship workflow.
 
+## [0.26.14.0] - 2026-09-07
+
+### Changed
+
+- Release guidance now records `v0.26.13` as the completed State Contract Guard release proof, including the exact tag, commit, protected workflow run, four-package token-free OIDC publication, and provenance verification.
+- Launch status now identifies `0.26.13` as the current public release and records the successful eight-cell registry-only journey on both supported Node lines while preserving the earlier normal-release and bootstrap history.
+
 ## [0.26.13.0] - 2026-09-07
 
 ### Added
