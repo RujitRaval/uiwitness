@@ -114,21 +114,21 @@ test("writes explicit GitHub outputs without inheriting ambient output paths", a
 
 test("separates bootstrap publication from automatic OIDC registry verification", async () => {
   const workflow = await readFile(path.join(repositoryRoot, ".github", "workflows", "release.yml"), "utf8");
-  const jobEnvironment = workflow.match(/ {4}env:\n(?:(?: {6}.*\n)+)/u)?.[0] ?? "";
+  const prepareJob = workflow.slice(workflow.indexOf("  prepare-release:"), workflow.indexOf("  publish-npm:"));
+  const publishJob = workflow.slice(workflow.indexOf("  publish-npm:"), workflow.indexOf("  verify-provenance:"));
 
   assert.doesNotMatch(workflow, /registry-url:/u);
-  assert.doesNotMatch(jobEnvironment, /\$\{\{ runner\./u);
-  assert.equal(
-    (workflow.match(/PACKAGE_OUTPUT: \$\{\{ runner\.temp \}\}\/uiwitness-packages/gu) ?? []).length,
-    2,
-  );
+  assert.doesNotMatch(prepareJob, /id-token: write|NPM_BOOTSTRAP_TOKEN_PRESENT|NODE_AUTH_TOKEN/u);
+  assert.doesNotMatch(workflow, /^ {6}\S[^\n]*\$\{\{ runner\./mu);
+  assert.match(prepareJob, /\$RUNNER_TEMP\/uiwitness-release-bundle/u);
+  assert.match(publishJob, /\$RUNNER_TEMP\/uiwitness-release-bundle/u);
   assert.match(workflow, /NPM_BOOTSTRAP_TOKEN_PRESENT: \$\{\{ secrets\.NPM_TOKEN != '' \}\}/u);
   assert.match(
     workflow,
     /if: \$\{\{ env\.NPM_BOOTSTRAP_TOKEN_PRESENT == 'true' \}\}[\s\S]*npm config set \/\/registry\.npmjs\.org\/:_authToken/u,
   );
   assert.equal((workflow.match(/NODE_AUTH_TOKEN:/gu) ?? []).length, 1);
-  assert.match(workflow, /id-token: write/u);
+  assert.equal((workflow.match(/id-token: write/gu) ?? []).length, 1);
   assert.match(workflow, /bootstrap: \$\{\{ steps\.release-mode\.outputs\.bootstrap \}\}/u);
   const publishIndex = workflow.indexOf("- name: Publish npm artifacts");
   const registryGateIndex = workflow.indexOf("verify-public-url:");
@@ -138,7 +138,7 @@ test("separates bootstrap publication from automatic OIDC registry verification"
     workflow.slice(registryGateIndex),
     /node scripts\/public-url-registry-smoke\.mjs --tag "\$RELEASE_TAG" --with-deps/u,
   );
-  assert.match(workflow.slice(registryGateIndex), /needs: publish-npm/u);
+  assert.match(workflow.slice(registryGateIndex), /needs:\n {6}- publish-npm/u);
   assert.match(
     workflow.slice(registryGateIndex),
     /needs\.publish-npm\.outputs\.bootstrap == 'false'/u,

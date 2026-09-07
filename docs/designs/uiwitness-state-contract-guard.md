@@ -1009,7 +1009,7 @@ Synthesized from this review's findings. Execute in order; each item ships throu
   - Surfaced by: Stale Diagram Audit and every compatibility/security decision.
   - Files: `README.md`, `docs/architecture/ARCHITECTURE.md`, `docs/engineering/{IMPLEMENTATION_PLAN,TEST_STRATEGY,SECURITY_PRIVACY,CLI_API}.md`, product/open-source docs.
   - Verify: `node scripts/check-docs.mjs`, brand/link checks, examples match exact shipped CLI and schemas.
-- [ ] **T14 (P1, human: ~3 days / Codex: ~4h)** — Release — Extend package, Action, provenance, and registry consumer proof
+- [x] **T14 (P1, human: ~3 days / Codex: ~4h)** — Release — Extend package, Action, provenance, and registry consumer proof
   - Surfaced by: Section 9 — each public protocol needs proof from exact release artifacts, not only workspace source.
   - Files: release/package-smoke scripts/tests, `.github/workflows/release.yml`, release guidance.
   - Verify: complete required suite, Node 22/24 packed consumers, Action SHA fixture, OIDC publication, provenance, registry-only normal journey.

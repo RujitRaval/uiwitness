@@ -478,15 +478,15 @@ reporting, `uiwitness check <url>` orchestration, overwrite-safe
 check → promotion → scan → open release gate are implemented. Keep future work in
 an explicitly approved roadmap slice.
 
-The approved State Contract Guard roadmap is active. T1 through T13 are
-complete: strict contracts and RFC 8785 digests, exhaustive deterministic
-comparison, complete fresh-run `uiwitness guard` orchestration,
-exact-coordinate reproduction, deterministic machine verdicts, immutable
-content-addressed proposals, constrained metadata overlays, and named
-single-use acceptance, and one crash-recoverable atomic generation transaction
-for report, evidence, verdict, proposal, overlay, manifest, JSON copy, and HTML,
-plus the contract-first offline verdict experience, thin full-SHA-pinned GitHub Action adapter with exact project-local CLI parity, bounded hosted output, minimum permissions, and opt-in evidence upload, complete exact/owned/visible/expiring exception governance, memory-only shared-read-only authentication, fail-closed masking with explicit evidence retention, nonce-bound deterministic shard plans with immutable partial bundles, fail-closed order-independent aggregation into one deterministic final generation, and consolidated operator, architecture, security, CLI, report, Action, migration, and testing guidance. T14 remains a separate approved release-proof slice and must not be pulled forward
-implicitly.
+The approved State Contract Guard roadmap is complete through T14. Its strict
+contracts, deterministic guard/proposal governance, crash-recoverable local
+generation, contract-first report, exception controls, memory-only
+authentication, fail-closed evidence privacy, deterministic sharding, thin
+full-SHA-pinned Action, and consolidated guidance are implemented. The release
+path now proves the exact four packed artifacts and matching Action SHA on Node
+22 and 24, verifies published npm provenance against integrity and release
+identity, and runs the registry-only normal journey on both supported Node
+lines. Future work requires a newly approved roadmap slice.
 
 At each handoff provide: API implemented; behavior; fixture and
 integration tests added; build/test commands; assumptions; unresolved

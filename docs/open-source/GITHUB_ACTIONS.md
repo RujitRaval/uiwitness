@@ -61,7 +61,7 @@ jobs:
 
 The Action reads its own checked-in `VERSION`, runs the project-local `uiwitness --version`, and stops before browser work if the versions differ. Each guard invocation writes and validates a new exclusive internal `--json` verdict copy, so stale evidence already in the workspace cannot satisfy the current job. The repair for version drift is exact: update the package and Action pin to the same release, reinstall, and commit the lockfile. UIWitness does not fall back to `npx`, a global binary, or an implicit package download.
 
-Full SemVer tags such as `v0.26.8` are protected by repository tag rules and are a readable convenience, but GitHub can technically move a tag. Mutable major tags are not published. Use the full release SHA for the strongest supply-chain boundary. To roll back, pin both the dependency and Action to the prior known-good release and rerun the same consumer proof.
+Full SemVer tags such as `v0.26.8` are protected by repository tag rules and are a readable convenience, but GitHub can technically move a tag. Mutable major tags are not published. Use the full release SHA for the strongest supply-chain boundary. The release workflow proves the exact four packed packages and matching Action SHA on Node 22 and 24 with both a pass and seeded regression before publication. It then verifies npm provenance and both registry consumers. To roll back, pin both the dependency and Action to the prior known-good release and rerun the same consumer proof.
 
 ## Inputs
 

@@ -22,4 +22,4 @@ Consumer examples request only `contents: read`, use normal secret-free fork pul
 - Adopting repositories control dependency installation and lockfiles; version drift fails before browser work.
 - The same CLI verdict is reproducible locally and in GitHub Actions.
 - Explicit artifact upload can still fail independently when the requested deliverable cannot be stored.
-- T14 must add release-time proof that one exact Action release SHA and the matching packed/public packages retain parity.
+- Release-time proof now requires one exact Action release SHA and the matching packed/public packages to retain pass and seeded-regression parity on Node 22 and 24.

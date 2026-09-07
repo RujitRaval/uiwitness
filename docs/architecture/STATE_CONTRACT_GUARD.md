@@ -190,4 +190,4 @@ No browser behavior enters core comparison, no comparison policy enters the runn
 - Every accepted bundle set is exactly one coherent `1..M` assignment union.
 - New runner-owned files and directories are owner-private where supported.
 - The committed marker is authoritative only when its content-addressed manifest and members validate.
-- T14, not this architecture document, owns proof from packed packages, the released Action SHA, npm provenance, and a registry-only consumer.
+- Release proof exercises the exact packed packages and matching Action SHA on Node 22 and 24, verifies npm provenance, and repeats the registry-only consumer journey on both Node lines.
