@@ -218,6 +218,8 @@ The Northline scan intentionally exits `1` with exactly 56 passes and four failu
 
 Start with [CONTRIBUTING.md](CONTRIBUTING.md). The [Quick Check guide](docs/open-source/PUBLIC_URL_QUICK_CHECK.md), [documentation map](codex/MASTER_PROMPT.md), [implementation specification](codex/IMPLEMENTATION_SPEC.md), [release guide](docs/open-source/RELEASING.md), and [launch strategy](docs/open-source/LAUNCH_STRATEGY.md) explain the product boundary and workflow.
 
+Product leaders, design partners, and new customers can use the [CEO report and customer launch playbook](docs/open-source/CEO_CUSTOMER_REPORT.md) for the complete product status, delivery history, launch-readiness assessment, customer onboarding journey, repository guide, risks, metrics, and recommended next gates.
+
 ## Roadmap
 
 The current release is the local-first v0.1 product: explicit matrices, deterministic Playwright scenarios, offline evidence, CI usage, a complete example, the completed [public URL Quick Check](docs/designs/public-url-quick-check.md), and the complete T1–T14 [State Contract Guard roadmap](docs/designs/uiwitness-state-contract-guard.md). Exact packed packages and the matching full Action SHA are exercised on Node 22 and 24 before publication; normal releases then verify npm provenance and repeat the registry-only journey on both Node lines. Hosted collaboration remains out of scope unless real demand appears.
