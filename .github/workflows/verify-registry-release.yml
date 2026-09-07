@@ -60,4 +60,6 @@ jobs:
           node-version: 24.19.0
           package-manager-cache: false
       - name: Run the tag-bound registry-only consumer gate
-        run: node scripts/public-url-registry-smoke.mjs --tag "$RELEASE_TAG" --with-deps
+        run: |
+          node scripts/verify-release-provenance.mjs --tag "$RELEASE_TAG" --sha "${{ steps.release.outputs.release-sha }}"
+          node scripts/public-url-registry-smoke.mjs --tag "$RELEASE_TAG" --with-deps

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import {
+  copyFile,
   lstat,
   mkdir,
   mkdtemp,
@@ -17,6 +18,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { RELEASE_PACKAGES, validateReleaseWorkspace } from "./check-release-packages.mjs";
+import { normalizeActionSha, runReleaseActionFixture } from "./release-action-smoke.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 const commandTimeout = 180_000;
@@ -121,6 +123,21 @@ async function createOutputDirectory(requestedPath) {
   return output;
 }
 
+async function existingPackageDirectory(requestedPath) {
+  const resolved = path.resolve(requestedPath);
+  const metadata = await lstat(resolved);
+  assert.equal(metadata.isSymbolicLink(), false, "Release package input must not be a symbolic link.");
+  assert.equal(metadata.isDirectory(), true, "Release package input must be a directory.");
+  return realpath(resolved);
+}
+
+export async function resolveActionSha({ execute = runCommand, root = repositoryRoot, value } = {}) {
+  if (value !== undefined) return normalizeActionSha(value);
+  const result = await execute("git", ["rev-parse", "HEAD"], { cwd: root, timeout: 30_000 });
+  assertCommand(result, "Resolving the Action commit SHA");
+  return normalizeActionSha(result.stdout.trim());
+}
+
 async function assertInstalledPackage(packageRoot, contract, packageVersion) {
   const manifest = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
   assert.equal(manifest.name, contract.name);
@@ -207,41 +224,74 @@ export async function assertPackedBrandContract(nodeModulesRoot) {
 }
 
 export async function runReleasePackageSmoke({
+  actionSha,
+  input,
+  onProgress = () => {},
   output,
   root = repositoryRoot,
 } = {}) {
+  assert.equal(input === undefined || output === undefined, true, "Specify at most one of --input and --output.");
   const { packageVersion } = await validateReleaseWorkspace({ root });
-  const localRoot = output === undefined
+  const resolvedActionSha = await resolveActionSha({ root, value: actionSha });
+  const localRoot = output === undefined && input === undefined
     ? await mkdtemp(path.join(os.tmpdir(), "uiwitness-package-smoke-"))
     : undefined;
-  const packageOutput = output === undefined
-    ? path.join(localRoot, "packages")
-    : await createOutputDirectory(output);
-  if (output === undefined) await mkdir(packageOutput, { mode: 0o700 });
+  const packageOutput = input !== undefined
+    ? await existingPackageDirectory(input)
+    : output === undefined
+      ? path.join(localRoot, "packages")
+      : await createOutputDirectory(output);
+  if (output === undefined && input === undefined) await mkdir(packageOutput, { mode: 0o700 });
   const consumerRoot = await mkdtemp(path.join(os.tmpdir(), "uiwitness-package-consumer-"));
+  const npmEnvironment = {
+    ...process.env,
+    npm_config_cache: path.join(consumerRoot, ".npm-cache"),
+  };
   let fixtureServer;
 
   try {
     const tarballs = [];
     for (const contract of RELEASE_PACKAGES) {
-      const buildEntry = path.join(root, contract.directory, "dist", "index.js");
-      assert.equal((await lstat(buildEntry)).isFile(), true, `${contract.name} must be built before packing.`);
-      const pack = await runCommand(
-        "corepack",
-        ["pnpm", "--filter", contract.name, "pack", "--pack-destination", packageOutput],
-        { cwd: root },
-      );
-      assertCommand(pack, `Packing ${contract.name}`);
+      onProgress(`${input === undefined ? "Packing" : "Validating"} ${contract.name}.`);
       const tarball = path.join(packageOutput, releaseTarballName(contract.name, packageVersion));
+      if (input === undefined) {
+        const buildEntry = path.join(root, contract.directory, "dist", "index.js");
+        assert.equal((await lstat(buildEntry)).isFile(), true, `${contract.name} must be built before packing.`);
+        const pack = await runCommand(
+          "corepack",
+          ["pnpm", "--filter", contract.name, "pack", "--pack-destination", packageOutput],
+          { cwd: root },
+        );
+        assertCommand(pack, `Packing ${contract.name}`);
+      }
       assert.equal((await lstat(tarball)).isFile(), true, `${contract.name} tarball was not created.`);
-      const dryRun = await runCommand("npm", ["publish", tarball, "--dry-run", "--json"], { cwd: root });
-      assertCommand(dryRun, `Dry-run publishing ${contract.name}`);
-      const publishSummary = JSON.parse(dryRun.stdout);
-      assertPublishSummaryIdentity(publishSummary, contract.name, packageVersion);
+      assert.equal((await lstat(tarball)).isSymbolicLink(), false, `${contract.name} tarball must not be a symbolic link.`);
+      if (input === undefined) {
+        const dryRun = await runCommand("npm", ["publish", tarball, "--dry-run", "--json", "--offline"], {
+          cwd: root,
+          env: npmEnvironment,
+        });
+        assertCommand(dryRun, `Dry-run publishing ${contract.name}`);
+        const publishSummary = JSON.parse(dryRun.stdout);
+        assertPublishSummaryIdentity(publishSummary, contract.name, packageVersion);
+      }
       tarballs.push(tarball);
     }
+    assert.deepEqual(
+      (await readdir(packageOutput)).sort(),
+      tarballs.map((tarball) => path.basename(tarball)).sort(),
+      "Release package input must contain exactly the four expected tarballs.",
+    );
+    const consumerPackageRoot = path.join(consumerRoot, "packages");
+    await mkdir(consumerPackageRoot, { mode: 0o700 });
+    const consumerTarballs = [];
+    for (const tarball of tarballs) {
+      const consumerTarball = path.join(consumerPackageRoot, path.basename(tarball));
+      await copyFile(tarball, consumerTarball);
+      consumerTarballs.push(consumerTarball);
+    }
 
-    const npmInit = await runCommand("npm", ["init", "--yes"], { cwd: consumerRoot });
+    const npmInit = await runCommand("npm", ["init", "--yes"], { cwd: consumerRoot, env: npmEnvironment });
     assertCommand(npmInit, "Initializing a default npm consumer");
     const consumerManifest = JSON.parse(
       await readFile(path.join(consumerRoot, "package.json"), "utf8"),
@@ -251,6 +301,7 @@ export async function runReleasePackageSmoke({
       "module",
       "npm init must leave the consumer outside package-wide ESM mode.",
     );
+    onProgress("Installing the exact four tarballs in a CommonJS-default consumer.");
     const install = await runCommand(
       "npm",
       [
@@ -259,16 +310,17 @@ export async function runReleasePackageSmoke({
         "--no-audit",
         "--no-fund",
         "--package-lock=false",
-        ...tarballs,
+        ...consumerTarballs,
       ],
-      { cwd: consumerRoot },
+      { cwd: consumerRoot, env: npmEnvironment },
     );
     assertCommand(install, "Installing packed packages");
 
+    onProgress("Installing pinned Chromium in the packed consumer.");
     const chromiumInstall = await runCommand(
       "npm",
       ["exec", "--offline", "--", "playwright", "install", "chromium"],
-      { cwd: consumerRoot },
+      { cwd: consumerRoot, env: npmEnvironment },
     );
     assertCommand(chromiumInstall, "Installing Chromium from the packed consumer");
 
@@ -309,12 +361,14 @@ export async function runReleasePackageSmoke({
     );
     const help = await runCommand("npm", ["exec", "--offline", "--", "uiwitness", "--help"], {
       cwd: consumerRoot,
+      env: npmEnvironment,
     });
     assertCommand(help, "Running the packed CLI");
     assert.match(help.stdout, /uiwitness scan/u);
 
     const init = await runCommand("npm", ["exec", "--offline", "--", "uiwitness", "init"], {
       cwd: consumerRoot,
+      env: npmEnvironment,
     });
     assertCommand(init, "Initializing with the packed CLI");
     const generatedConfigPath = path.join(consumerRoot, "uiwitness.config.mts");
@@ -391,7 +445,18 @@ export async function runReleasePackageSmoke({
       /UI State Coverage Report/u,
     );
 
-    return { packageOutput, packageVersion, tarballs };
+    onProgress(`Running passing and seeded-regression guards through Action ${resolvedActionSha}.`);
+    const action = await runReleaseActionFixture({
+      actionRoot: root,
+      actionSha: resolvedActionSha,
+      cliBinPath,
+      consumerRoot,
+      execute: runCommand,
+      fixtureUrl: `http://127.0.0.1:${fixtureAddress.port}`,
+      packageVersion,
+    });
+
+    return { action, packageOutput, packageVersion, tarballs };
   } finally {
     if (fixtureServer?.listening) {
       await new Promise((resolve, reject) => {
@@ -410,10 +475,13 @@ function argumentValue(arguments_, name) {
 
 async function main() {
   const result = await runReleasePackageSmoke({
+    actionSha: argumentValue(process.argv, "--action-sha"),
+    input: argumentValue(process.argv, "--input"),
+    onProgress: (message) => console.log(message),
     output: argumentValue(process.argv, "--output"),
   });
   console.log(
-    `Release package smoke passed: ${result.tarballs.length} tarballs at ${result.packageVersion} install, import, and run from npm artifacts.`,
+    `Release package smoke passed: ${result.tarballs.length} tarballs at ${result.packageVersion} install and run with pinned Action ${result.action.actionSha} parity for passing and seeded-regression guards.`,
   );
 }
 

@@ -222,7 +222,7 @@ Runner publication is crash-recoverable. The stable generation marker is publish
 
 To roll back contract intent, restore a reviewed earlier `uiwitness.contract.json` through normal version control, rerun the complete guard, and review the new result. Never copy an old `.uiwitness/` generation into place or reuse an expired shard plan.
 
-To roll back the Action, pin both the dependency and full Action SHA to the same prior known-good release and rerun the consumer proof. Release-artifact and registry proof are intentionally handled by the separate T14 release slice.
+To roll back the Action, pin both the dependency and full Action SHA to the same prior known-good release and rerun the consumer proof. Every normal release exercises that matching pair from packed artifacts on Node 22 and 24 before publication, then verifies provenance and registry consumers after publication.
 
 ## Compatibility boundaries
 

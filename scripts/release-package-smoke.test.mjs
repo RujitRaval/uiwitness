@@ -13,6 +13,7 @@ import {
   assertPackedBrandContract,
   assertPublishSummaryIdentity,
   releaseTarballName,
+  resolveActionSha,
   runCommand,
 } from "./release-package-smoke.mjs";
 import { RELEASE_PACKAGES, validateReleaseWorkspace } from "./check-release-packages.mjs";
@@ -101,6 +102,27 @@ test("runs bounded shell-free release commands", async () => {
   await assert.rejects(
     runCommand(process.execPath, ["--eval", "setTimeout(() => {}, 1_000)"], { timeout: 10 }),
     /exceeded 10ms/u,
+  );
+});
+
+test("binds package smoke to an explicit or repository Action SHA", async () => {
+  const sha = "0123456789abcdef0123456789abcdef01234567";
+  assert.equal(await resolveActionSha({ value: sha }), sha);
+  assert.equal(await resolveActionSha({
+    execute: async (command, args, options) => {
+      assert.equal(command, "git");
+      assert.deepEqual(args, ["rev-parse", "HEAD"]);
+      assert.equal(options.timeout, 30_000);
+      return { code: 0, signal: null, stderr: "", stdout: `${sha}\n` };
+    },
+    root: repositoryRoot,
+  }), sha);
+  await assert.rejects(
+    resolveActionSha({
+      execute: async () => ({ code: 1, signal: null, stderr: "not a checkout", stdout: "" }),
+      root: repositoryRoot,
+    }),
+    /Resolving the Action commit SHA failed/u,
   );
 });
 

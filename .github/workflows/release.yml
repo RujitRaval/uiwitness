@@ -12,11 +12,77 @@ permissions:
   contents: read
 
 jobs:
-  publish-npm:
-    name: Publish npm packages
+  prepare-release:
+    name: Prepare exact release artifacts
     if: ${{ github.event.release.prerelease == false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Set up release-verification runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+      - name: Validate release identity and metadata
+        run: |
+          node scripts/check-release-packages.mjs --tag "$RELEASE_TAG"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")" = "$GITHUB_SHA"
+          git merge-base --is-ancestor HEAD origin/main
+      - name: Validate brand contract
+        run: node scripts/check-brand.mjs --strict
+      - name: Install locked dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Install pinned Chromium
+        run: corepack pnpm --filter uiwitness-runner-playwright exec playwright install --with-deps chromium
+      - name: Run repository verification
+        run: node scripts/run-ci.mjs
+      - name: Enforce contract-core performance budget
+        run: corepack pnpm benchmark:contract
+      - name: Run production release smoke
+        run: env -u GITHUB_OUTPUT corepack pnpm release:smoke
+      - name: Pack and test npm artifacts
+        run: |
+          mkdir -p "$RUNNER_TEMP/uiwitness-release-bundle"
+          node scripts/release-package-smoke.mjs --output "$RUNNER_TEMP/uiwitness-release-bundle/packages" --action-sha "$GITHUB_SHA"
+      - name: Set up Node 22 release consumer
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.20.0
+          package-manager-cache: false
+      - name: Retest exact npm artifacts and Action on Node 22
+        run: node scripts/release-package-smoke.mjs --input "$RUNNER_TEMP/uiwitness-release-bundle/packages" --action-sha "$GITHUB_SHA"
+      - name: Bind exact artifacts to the release identity
+        run: >-
+          node scripts/release-artifact-manifest.mjs create
+          --input "$RUNNER_TEMP/uiwitness-release-bundle/packages"
+          --output "$RUNNER_TEMP/uiwitness-release-bundle/release-manifest.json"
+          --tag "$RELEASE_TAG"
+          --sha "$GITHUB_SHA"
+      - name: Transfer the verified release bundle
+        id: upload-release-bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: uiwitness-release-${{ github.sha }}
+          path: ${{ runner.temp }}/uiwitness-release-bundle
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-npm:
+    name: Publish npm packages
+    needs: prepare-release
+    if: ${{ needs.prepare-release.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     environment: npm-publish
     permissions:
       contents: read
@@ -38,6 +104,11 @@ jobs:
         with:
           node-version: 24.19.0
           package-manager-cache: false
+      - name: Download the exact release bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: uiwitness-release-${{ github.sha }}
+          path: ${{ runner.temp }}/uiwitness-release-bundle
       - name: Record release mode
         id: release-mode
         run: |
@@ -48,32 +119,15 @@ jobs:
         run: npm config set //registry.npmjs.org/:_authToken "$NODE_AUTH_TOKEN" --location=user
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Validate release identity and metadata
+      - name: Validate release identity and artifact manifest
         run: |
           node scripts/check-release-packages.mjs --tag "$RELEASE_TAG"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test "$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")" = "$GITHUB_SHA"
           git merge-base --is-ancestor HEAD origin/main
-      - name: Validate brand contract
-        run: node scripts/check-brand.mjs --strict
-      - name: Install locked dependencies
-        run: corepack pnpm install --frozen-lockfile
-      - name: Install pinned Chromium
-        run: corepack pnpm --filter uiwitness-runner-playwright exec playwright install --with-deps chromium
-      - name: Run repository verification
-        run: node scripts/run-ci.mjs
-      - name: Enforce contract-core performance budget
-        run: corepack pnpm benchmark:contract
-      - name: Run production release smoke
-        run: env -u GITHUB_OUTPUT corepack pnpm release:smoke
-      - name: Pack and test npm artifacts
-        run: node scripts/release-package-smoke.mjs --output "$PACKAGE_OUTPUT"
-        env:
-          PACKAGE_OUTPUT: ${{ runner.temp }}/uiwitness-packages
+          node scripts/release-artifact-manifest.mjs verify --input "$RUNNER_TEMP/uiwitness-release-bundle/packages" --manifest "$RUNNER_TEMP/uiwitness-release-bundle/release-manifest.json" --tag "$RELEASE_TAG" --sha "$GITHUB_SHA"
       - name: Publish npm artifacts
-        run: node scripts/publish-release-packages.mjs --input "$PACKAGE_OUTPUT" --tag "$RELEASE_TAG"
-        env:
-          PACKAGE_OUTPUT: ${{ runner.temp }}/uiwitness-packages
+        run: node scripts/publish-release-packages.mjs --input "$RUNNER_TEMP/uiwitness-release-bundle/packages" --tag "$RELEASE_TAG"
       - name: Record bootstrap cleanup requirement
         if: ${{ always() && env.NPM_BOOTSTRAP_TOKEN_PRESENT == 'true' }}
         run: |
@@ -86,12 +140,12 @@ jobs:
             echo "Within 30 minutes of this attempt finishing, configure trusted publishers for every created package, revoke the temporary npm token, delete the npm-publish environment's NPM_TOKEN secret, and record the evidence for the manual registry-verification workflow. Use a fresh token for every retry."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  verify-public-url:
-    name: Verify published public URL journey
+  verify-provenance:
+    name: Verify published provenance
     needs: publish-npm
     if: ${{ needs.publish-npm.result == 'success' && needs.publish-npm.outputs.bootstrap == 'false' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -106,6 +160,40 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.19.0
+          package-manager-cache: false
+      - name: Verify all package provenance
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          node scripts/verify-release-provenance.mjs --tag "$RELEASE_TAG" --sha "$RELEASE_SHA"
+
+  verify-public-url:
+    name: Verify registry journey (Node ${{ matrix.node-version }})
+    needs:
+      - publish-npm
+      - verify-provenance
+    if: ${{ needs.publish-npm.result == 'success' && needs.publish-npm.outputs.bootstrap == 'false' && needs.verify-provenance.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - 22.20.0
+          - 24.19.0
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      RELEASE_SHA: ${{ needs.publish-npm.outputs.release-sha }}
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+      - name: Set up the registry-consumer runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node-version }}
           package-manager-cache: false
       - name: Run the registry-only consumer gate
         run: |

@@ -44,7 +44,7 @@ test("State Contract Guard documentation preserves safety and roadmap boundaries
     "Authentication is optional and unsharded",
     "evidence upload off by default",
     "full 40-character release commit SHA",
-    "Release-artifact and registry proof are intentionally handled by the separate T14 release slice",
+    "Every normal release exercises that matching pair from packed artifacts on Node 22 and 24 before publication",
   ]) {
     assert.match(guide, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
   }
@@ -63,7 +63,7 @@ test("State Contract Guard documentation preserves safety and roadmap boundaries
   }
 
   assert.match(roadmap, /- \[x\] \*\*T13/u);
-  assert.match(roadmap, /- \[ \] \*\*T14/u);
+  assert.match(roadmap, /- \[x\] \*\*T14/u);
   assert.match(
     readme,
     /compare contract → commit one evidence\/verdict\/proposal generation → inspect → repair or accept named changes → rerun/u,

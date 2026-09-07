@@ -220,7 +220,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). The [Quick Check guide](docs/open
 
 ## Roadmap
 
-The current release is the local-first v0.1 product: explicit matrices, deterministic Playwright scenarios, offline evidence, CI usage, a complete example, the completed [public URL Quick Check](docs/designs/public-url-quick-check.md), and T1–T13 of the approved [State Contract Guard roadmap](docs/designs/uiwitness-state-contract-guard.md), including the canonical operator guide and architecture diagrams. T14 remains the separate package, Action, provenance, and registry-consumer release proof. Hosted collaboration remains out of scope unless real demand appears.
+The current release is the local-first v0.1 product: explicit matrices, deterministic Playwright scenarios, offline evidence, CI usage, a complete example, the completed [public URL Quick Check](docs/designs/public-url-quick-check.md), and the complete T1–T14 [State Contract Guard roadmap](docs/designs/uiwitness-state-contract-guard.md). Exact packed packages and the matching full Action SHA are exercised on Node 22 and 24 before publication; normal releases then verify npm provenance and repeat the registry-only journey on both Node lines. Hosted collaboration remains out of scope unless real demand appears.
 
 ## License
 
