@@ -27,7 +27,7 @@ UIWitness does not rename, copy, upload, or delete existing `.statecraft/` evide
 
    ```bash
    npm uninstall statecraft-ui
-   npm install --save-dev uiwitness playwright@1.62.1
+   npm install --save-dev --save-exact uiwitness@0.26.13 playwright@1.62.1
    ```
 
    Direct API consumers should replace the corresponding supporting package from the table above.
