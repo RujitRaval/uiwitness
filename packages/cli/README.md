@@ -5,7 +5,7 @@ Use the [State Contract Guard guide](https://github.com/RujitRaval/uiwitness/blo
 The npm package for the `uiwitness` CLI. UIWitness checks public websites or renders configured UI product states with Playwright, captures screenshots and diagnostics, and writes an offline coverage report.
 
 ```bash
-npm install --save-dev uiwitness playwright@1.62.1
+npm install --save-dev --save-exact uiwitness@0.26.13 playwright@1.62.1
 npx playwright install chromium
 npx uiwitness check https://example.com
 npx uiwitness check https://example.com --write-config

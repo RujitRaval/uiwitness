@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 
 const defaultIgnoredDirectories = new Set([
   ".git",
+  ".gstack",
   ".statecraft",
   ".uiwitness",
   "coverage",
@@ -14,8 +15,14 @@ const defaultIgnoredDirectories = new Set([
 const defaultRequiredFiles = [
   "README.md",
   "AGENTS.md",
+  "CODE_OF_CONDUCT.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
+  "SUPPORT.md",
+  ".github/ISSUE_TEMPLATE/bug_report.yml",
+  ".github/ISSUE_TEMPLATE/customer_pilot_feedback.yml",
+  ".github/ISSUE_TEMPLATE/feature_evidence.yml",
+  ".github/ISSUE_TEMPLATE/config.yml",
   "codex/MASTER_PROMPT.md",
   "codex/IMPLEMENTATION_SPEC.md",
   "docs/product/PRD.md",

@@ -43,7 +43,7 @@ test("migration guide documents copy-paste commands and the no-touch evidence po
 
   for (const command of [
     "npm uninstall statecraft-ui",
-    "npm install --save-dev uiwitness playwright@1.62.1",
+    "npm install --save-dev --save-exact uiwitness@0.26.13 playwright@1.62.1",
     "test ! -e uiwitness.config.mts",
     "test ! -e uiwitness",
     "mv statecraft.config.mts uiwitness.config.mts",

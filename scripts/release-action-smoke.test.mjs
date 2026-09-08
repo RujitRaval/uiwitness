@@ -14,6 +14,35 @@ import {
 const root = path.resolve(import.meta.dirname, "..");
 const sha = "0123456789abcdef0123456789abcdef01234567";
 const digest = `sha256:${"0".repeat(64)}`;
+const customerRelease = "0.26.13";
+const customerReleaseSha = "64c6f6dd0f541a5f79c1ec165080ed9e5a8a316b";
+
+test("customer docs stay pinned to the current protected release", async () => {
+  const installLine = `npm install --save-dev --save-exact uiwitness@${customerRelease} playwright@1.62.1`;
+  for (const relativePath of [
+    "README.md",
+    "docs/open-source/GITHUB_ACTIONS.md",
+    "docs/open-source/MIGRATING_TO_UIWITNESS.md",
+    "docs/open-source/PUBLIC_URL_QUICK_CHECK.md",
+    "packages/cli/README.md",
+  ]) {
+    const source = await readFile(path.join(root, relativePath), "utf8");
+    assert.match(source, new RegExp(installLine.replaceAll(".", "\\."), "u"), relativePath);
+  }
+
+  const actionGuide = await readFile(path.join(root, "docs/open-source/GITHUB_ACTIONS.md"), "utf8");
+  const actionPin = `uses: RujitRaval/uiwitness@${customerReleaseSha} # v${customerRelease}`;
+  assert.equal(actionGuide.split(actionPin).length - 1, 3);
+  assert.doesNotMatch(actionGuide, /<full-release-commit-sha>|v0\.26\.8/u);
+
+  for (const relativePath of [
+    "docs/open-source/PUBLIC_URL_QUICK_CHECK.md",
+    "docs/open-source/RELEASING.md",
+  ]) {
+    const source = await readFile(path.join(root, relativePath), "utf8");
+    assert.match(source, new RegExp(`release:registry-public-url-smoke -- --version ${customerRelease.replaceAll(".", "\\.")}`, "u"), relativePath);
+  }
+});
 
 test("creates a minimum-permission consumer workflow pinned to one full Action SHA", () => {
   const source = actionWorkflowSource({ nodeVersion: "22.20.0", packageVersion: "1.2.3", sha });

@@ -49,7 +49,7 @@ node scripts/release-package-smoke.mjs --input /absolute/path/to/tarballs --acti
 After npm publication, repeat the exact live-registry Quick Check journey for the released version:
 
 ```bash
-corepack pnpm release:registry-public-url-smoke -- --version 0.24.11
+corepack pnpm release:registry-public-url-smoke -- --version 0.26.13
 ```
 
 This creates another empty `npm init -y` consumer, accepts either an implicit CommonJS manifest or npm 11's explicit `"type": "commonjs"` form, installs exact packages from the explicit npmjs registry, and runs evidence-only `check` → `check --write-config` → untouched `scan` → `open` against a deterministic two-page loopback fixture. It validates eight screenshots, schema-v1 JSON, kinetic HTML, generated-source stability, and the installed report-opening command before removing the temporary project. Use the npm version that was just published; this gate cannot pass before that version exists on the registry. Transient install failures share one bounded ten-minute elapsed-time retry window. Each attempt forces online registry revalidation through its own temporary npm cache, while permanent failures stop immediately.

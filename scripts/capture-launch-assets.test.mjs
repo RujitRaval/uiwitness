@@ -1,14 +1,31 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   captureLaunchAssets,
   launchDetailSelector,
 } from "../apps/example-nextjs/scripts/capture-launch-assets.mjs";
+
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+test("checked-in launch assets match the fictional-only review baseline", async () => {
+  const review = await readFile(path.join(repositoryRoot, "docs", "assets", "README.md"), "utf8");
+  const reviewedAssets = new Map([
+    ["uiwitness-report-overview.png", "5334de21b141fc5617184f9724d680bc1369d6826fb87ca89939912fa8c1d10e"],
+    ["uiwitness-failure-detail.png", "ddd9e5f3a5a509a9c9cafe719cdddec1813322b4ccd755210fe746495ab28742"],
+  ]);
+
+  for (const [filename, expectedDigest] of reviewedAssets) {
+    const bytes = await readFile(path.join(repositoryRoot, "docs", "assets", filename));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), expectedDigest);
+    assert.ok(review.includes(`| \`${filename}\` | \`${expectedDigest}\` |`));
+  }
+});
 
 test("launchDetailSelector accepts a generated execution detail id", () => {
   assert.equal(launchDetailSelector("execution-57"), "#execution-57");
