@@ -12,11 +12,11 @@ async function source(relativePath) {
 }
 
 function issueFormTypes(contents) {
-  return [...contents.matchAll(/^  - type: ([a-z-]+)$/gmu)].map((match) => match[1]);
+  return [...contents.matchAll(/^ {2}- type: ([a-z-]+)$/gmu)].map((match) => match[1]);
 }
 
 function issueFormIds(contents) {
-  return [...contents.matchAll(/^    id: ([a-z_]+)$/gmu)].map((match) => match[1]);
+  return [...contents.matchAll(/^ {4}id: ([a-z_]+)$/gmu)].map((match) => match[1]);
 }
 
 test("GitHub exposes exactly the three reviewed public issue forms", async () => {
@@ -36,15 +36,15 @@ test("GitHub exposes exactly the three reviewed public issue forms", async () =>
 
   for (const [filename, expectedIds] of expectations) {
     const contents = await readFile(path.join(templateRoot, filename), "utf8");
-    assert.match(contents, /^name: .+\ndescription: .+\ntitle: ".+"\nlabels:\n  - (bug|question|enhancement)\nbody:\n/u, filename);
+    assert.match(contents, /^name: .+\ndescription: .+\ntitle: ".+"\nlabels:\n {2}- (bug|question|enhancement)\nbody:\n/u, filename);
     assert.ok(issueFormTypes(contents).length > 1, filename);
     assert.ok(issueFormTypes(contents).every((type) => ["markdown", "input", "dropdown", "textarea", "checkboxes"].includes(type)), filename);
     assert.deepEqual(issueFormIds(contents), expectedIds, filename);
     assert.equal(new Set(issueFormIds(contents)).size, expectedIds.length, filename);
     // Every form has one checkbox group whose options, rather than the group,
     // carry their own required flags.
-    assert.equal((contents.match(/^      required: true$/gmu) ?? []).length, expectedIds.length - 1, filename);
-    assert.ok((contents.match(/^          required: true$/gmu) ?? []).length >= 3, filename);
+    assert.equal((contents.match(/^ {6}required: true$/gmu) ?? []).length, expectedIds.length - 1, filename);
+    assert.ok((contents.match(/^ {10}required: true$/gmu) ?? []).length >= 3, filename);
     assert.match(contents, /own(?:ed)? or (?:am|was) authorized to test/u, filename);
     assert.match(contents, /customer|customer-identifying/u, filename);
     assert.match(contents, /credentials/u, filename);

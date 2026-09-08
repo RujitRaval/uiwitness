@@ -9,13 +9,13 @@ This project uses the four-part version format required by the GStack ship workf
 ### Added
 
 - Contributors now have dedicated bug-report, customer-pilot, and feature-evidence issue forms, one Issues-only support path, and a project Code of Conduct with private security and conduct-reporting routes.
-- Launch screenshots now carry a dated fictional-Northline review record whose SHA-256 baselines make any later pixel change require a fresh privacy review.
+- Launch screenshots now carry a dated fictional-Northline review record whose SHA-256 baselines detect later byte drift; contributor guidance requires a fresh manual privacy review before accepting changed images.
 
 ### Changed
 
 - Customer install guidance stays fixed on protected release `0.26.13`, and every Contract Guard Action example now uses that release's matching full commit SHA.
 - The README leads with the real report evidence, states the authorization and evidence-sharing boundary before the first command, and records signed-out desktop and mobile review results.
-- Launch guidance now requires every public post to state both the testing-authorization boundary and the local-evidence privacy boundary.
+- Three checked-in launch-post variants now state both the testing-authorization boundary and the local-evidence privacy boundary, with repository tests enforcing the exact language in every variant.
 
 ## [0.26.14.0] - 2026-09-07
 
