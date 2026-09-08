@@ -30,6 +30,7 @@ const defaultRequiredFiles = [
   "docs/engineering/IMPLEMENTATION_PLAN.md",
   "docs/engineering/SECURITY_PRIVACY.md",
   "docs/engineering/TEST_STRATEGY.md",
+  "docs/open-source/LAUNCH_POSTS.md",
 ];
 
 async function collectMarkdownFiles(directory, ignoredDirectories) {

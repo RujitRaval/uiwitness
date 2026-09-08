@@ -22,6 +22,7 @@ test("customer docs stay pinned to the current protected release", async () => {
   for (const relativePath of [
     "README.md",
     "docs/open-source/GITHUB_ACTIONS.md",
+    "docs/open-source/LAUNCH_POSTS.md",
     "docs/open-source/MIGRATING_TO_UIWITNESS.md",
     "docs/open-source/PUBLIC_URL_QUICK_CHECK.md",
     "packages/cli/README.md",
@@ -29,6 +30,9 @@ test("customer docs stay pinned to the current protected release", async () => {
     const source = await readFile(path.join(root, relativePath), "utf8");
     assert.match(source, new RegExp(installLine.replaceAll(".", "\\."), "u"), relativePath);
   }
+
+  const readme = await readFile(path.join(root, "README.md"), "utf8");
+  assert.equal(readme.split(installLine).length - 1, 2);
 
   const actionGuide = await readFile(path.join(root, "docs/open-source/GITHUB_ACTIONS.md"), "utf8");
   const actionPin = `uses: RujitRaval/uiwitness@${customerReleaseSha} # v${customerRelease}`;
