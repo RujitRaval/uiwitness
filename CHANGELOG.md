@@ -4,6 +4,13 @@ All notable changes to UIWitness will be documented in this file.
 
 This project uses the four-part version format required by the GStack ship workflow.
 
+## [0.26.17.0] - 2026-09-10
+
+### Fixed
+
+- The Next.js example now resolves `sharp` 0.35.4 and patched native image libraries, addressing GHSA-rgj7-g3m4-5g8c without changing Next.js or weakening dependency installation policies.
+- A dependency-free regression check rejects vulnerable sharp and libvips versions across every platform recorded in the lockfile.
+
 ## [0.26.16.0] - 2026-09-08
 
 ### Added
