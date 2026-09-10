@@ -14,16 +14,30 @@ The checked-in assets are generated from the real Northline report:
 - `docs/assets/uiwitness-report-overview.png` shows the kinetic evidence verdict and 60-cell coverage signal.
 - `docs/assets/uiwitness-failure-detail.png` shows the approved customer long-content mobile overflow with its assertion and execution metadata.
 
-Regenerate them only from the complete local example scan. Start the production example, run its checked-in UIWitness matrix, confirm the expected 56 passes and four failures, then run `corepack pnpm launch:assets`. Review both PNGs for fictional-only data before committing them. The capture command blocks HTTP and HTTPS requests while opening the self-contained file report.
+Regenerate them only from the complete local example scan. Start the production example, run its checked-in UIWitness matrix, confirm the expected 56 passes and four failures, then run `corepack pnpm launch:assets`. Review both PNGs for fictional-only data before committing them. The capture command blocks HTTP and HTTPS requests while opening the self-contained file report. The current reviewed asset hashes and fictional-data provenance are recorded in the [launch asset review](../assets/README.md); the repository tests reject any byte drift from those reviewed files, while the documented manual review remains the privacy gate for new images.
 
 ## README above fold
 Name; promise; excellent GIF/screenshot; zero-config `npx uiwitness check <url>` entry point; configured `npx uiwitness scan` workflow; tiny matrix; contrast with conventional visual regression.
+
+The signed-out GitHub baseline review on 2026-09-08 covered the repository homepage and the rendered README section at 1440 × 1000 and 390 × 844. It found GitHub's own file list precedes README content on the repository homepage at both widths; that host-controlled ordering is not treated as a README defect. The branch with the reordered report image, fixed `0.26.13` install target, and explicit safety boundary must receive the same signed-out desktop and mobile review before merge.
+
+## Launch-copy safety boundary
+
+Every public launch post, regardless of channel or length, must include this boundary without weakening either sentence:
+
+> Test only software you own or are authorized to assess. UIWitness keeps evidence local by default, but screenshots, URLs, and diagnostics may contain sensitive data; review them before sharing or uploading.
+
+Posts may explain local-only Quick Check, configured scans, or Contract Guard, but must not imply permission to test third-party sites, automatic evidence privacy, or automatic GitHub artifact upload.
+
+The [approved launch posts](LAUNCH_POSTS.md) contain repository/release, professional-network, and community variants. Repository tests split that file by post and require the exact boundary in every variant.
 
 ## Distribution after stability
 npm; GitHub Actions workflow; demo repo; posts showing real findings; later Codex/Claude/OpenCode skills.
 
 ## Contribution surfaces
 Scenarios, examples, report UX, and later adapters/policies. Prepare bounded `good first issue` work.
+
+GitHub Issues is the one public support and feedback path. Discussions remains disabled so questions, pilot evidence, bugs, and feature evidence do not split across queues. The repository issue forms and [support guide](../../SUPPORT.md) route each request; suspected vulnerabilities stay in private vulnerability reporting.
 
 ## Metrics
 Stars plus npm downloads, repeat users, issues from real use, contributors, forks, downstream integrations, adapter requests.

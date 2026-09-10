@@ -1,10 +1,11 @@
 # UIWitness CEO Report and Customer Launch Playbook
 
-- **Status date:** September 7, 2026
+- **Status date:** September 10, 2026
+- **Original adoption snapshot:** September 7, 2026
 - **Repository:** [RujitRaval/uiwitness](https://github.com/RujitRaval/uiwitness)
 - **Current public release:** [`v0.26.13`](https://github.com/RujitRaval/uiwitness/releases/tag/v0.26.13) / npm `0.26.13`
-- **Public `main` baseline at analysis:** `0.26.14` reserved after recording the `v0.26.13` release proof
-- **This report's release candidate:** `0.26.15`
+- **Source baseline:** `0.26.17`, including the completed community cleanup and sharp security update
+- **This report's release candidate:** `0.26.18` (source version; not a published npm release)
 
 **Audience:** CEO/founder, launch owner, product and engineering leaders, prospective customers, design partners, and new repository visitors
 
@@ -22,8 +23,8 @@ The project has crossed the **technical launch** line. It has not yet crossed th
 
 - The repository is public, licensed under MIT, documented, protected, and green on its latest `main` checks.
 - The public `uiwitness` package is available at `0.26.13` with registry provenance.
-- The repository has 70 commits, 42 architecture decision records, four public packages, and 80 test/type-contract files.
-- The GitHub repository currently has zero stars, zero forks, zero watchers, and one open issue.
+- The September 7 snapshot recorded 70 commits, 42 architecture decision records, four public packages, and 80 test/type-contract files. Subsequent cleanup and maintenance are recorded in the changelog.
+- GitHub stars, forks, and watchers remained at zero when rechecked on September 10. The external pilot remains open.
 - npm recorded 276 downloads for `uiwitness` in the August 31–September 6 window, but registry downloads are not equivalent to unique users and may include release and CI activity.
 - No completed unassisted external-user observation is recorded yet.
 - [Issue #72](https://github.com/RujitRaval/uiwitness/issues/72) is the correct next gate: one developer who did not build UIWitness should run Quick Check on an authorized site using only the public documentation and report where the experience is confusing or useful.
@@ -412,7 +413,7 @@ The project moved from repository bootstrap to a distribution-proven contract sy
 | `0.25.5` | Completed external cutover and normal token-free OIDC release path |
 | `0.25.6` | Recorded the first normal post-bootstrap release proof |
 
-### 3.7 State Contract Guard and launch reporting — `0.26.0` through `0.26.15`
+### 3.7 State Contract Guard and launch reporting — `0.26.0` through `0.26.18`
 
 | Version | Delivered outcome |
 | --- | --- |
@@ -430,8 +431,10 @@ The project moved from repository bootstrap to a distribution-proven contract sy
 | `0.26.11` | Fail-closed aggregation and one authoritative merged generation |
 | `0.26.12` | Consolidated customer/operator guide, architecture diagrams, and documentation contract tests |
 | `0.26.13` | Exact package/Action release identity, Node 22/24 consumer proof, OIDC publication, and provenance verification |
-| `0.26.14` | Current `main` documentation state recording `v0.26.13` as the completed public proof; not yet a public npm release |
-| `0.26.15` | This CEO report, customer launch playbook, and README entry point; a release candidate until its pull request is merged and the protected release completes |
+| `0.26.14` | Documentation records `v0.26.13` as the completed public proof |
+| `0.26.16` | Completed community issue forms, Code of Conduct, Issues-only support, release-pinned Action examples, reviewed assets, and launch copy |
+| `0.26.17` | Updated the example's transitive sharp dependency and native libraries for GHSA-rgj7-g3m4-5g8c, with a dependency-free regression check |
+| `0.26.18` | This CEO report, customer launch playbook, and README entry point, reconciled with the completed cleanup; not a public npm release |
 
 ## 4. What is working?
 
@@ -459,12 +462,12 @@ The project moved from repository bootstrap to a distribution-proven contract sy
 The quality story is unusually complete for a pre-1.0 open-source tool:
 
 - Required root scripts exist for lint, typecheck, test, and build.
-- Eighty test or compile-time contract files cover core, CLI, runner, report, example app, scripts, release workflows, package consumers, and provenance.
+- Test and compile-time contract files cover core, CLI, runner, report, example app, scripts, release workflows, package consumers, and provenance.
 - Real Chromium tests exercise navigation, capture, privacy masks, reports, Quick Check, authentication, and the example application.
 - Package smoke installs exact tarballs into an isolated CommonJS-default consumer and imports every public package surface.
 - Release smoke proves the package/Action pair for a pass and seeded regression.
 - Core contract parsing/digest/comparison is benchmarked at 10,000 coordinates under one second and 256 MiB additional RSS on both supported Node lines.
-- This report branch passed 808 Vitest cases, 123 Node script tests, documentation checks across 102 tracked documents, every package build/typecheck/lint gate, and the four-tarball `0.26.15` package consumer smoke.
+- Validation for each source candidate runs documentation and script checks, lint, typecheck, the full Vitest suite, production builds, release metadata checks, and the four-tarball consumer/Action smoke. The pull request records the exact candidate and results.
 - The latest `main` CI and CodeQL runs completed successfully.
 - The `v0.26.13` protected release completed every job: artifact preparation, npm publication, provenance verification, Node 22 registry journey, and Node 24 registry journey.
 - The npm registry exposes an attestation URL and SLSA provenance for `uiwitness@0.26.13`.
@@ -498,7 +501,7 @@ Consequences:
 
 ### 5.2 Adoption is currently minimal
 
-As of the status date, GitHub reports zero stars, zero forks, zero watchers, and one open issue. npm reports 276 downloads during the week ending September 6, but those requests can include automated release, CI, and cache activity. They should not be presented as 276 users.
+The September 10 GitHub recheck still shows zero stars, forks, and watchers. The original September 7 snapshot recorded 276 npm downloads during the week ending September 6, but those requests can include automated release, CI, and cache activity. They should not be presented as 276 users.
 
 This is not a product failure; the product has only just completed its distribution proof. It does mean the CEO should treat adoption, activation, and retention as unknown rather than positive.
 
@@ -510,21 +513,19 @@ Mitigation: every launch message and example command should say that exit `1` wi
 
 ### 5.4 Current source is ahead of the public release
 
-At the time of analysis, public `main` identified itself as `0.26.14`, while npm and the latest GitHub Release were `0.26.13`. The `0.26.14` change records release proof and is not a missing product release. This report is versioned as the `0.26.15` release candidate; that version is not public until its pull request is merged and the protected release succeeds.
+Source development is ahead of the latest published release. Source `0.26.16` completed launch/community cleanup, and `0.26.17` updated the example's transitive sharp image-processing libraries. This report uses source candidate `0.26.18`. These source versions do not imply npm publication.
 
-Mitigation: customer instructions should pin `0.26.13` until another protected release is deliberately created. Do not imply that `0.26.14` or `0.26.15` is available from npm before publication.
+Customer commands must stay pinned to the proven `0.26.13` release until another protected release is deliberately published. The sharp update affects the private Next.js example's dependency tree; the public CLI packages do not depend on sharp.
 
-### 5.5 Some copy-ready Action examples still show `0.26.8`
+### 5.5 Action examples are aligned with the public release
 
-The GitHub Actions guide’s example dependency and comments use `0.26.8`, while the latest proven package/Action release is `0.26.13`. The guide correctly tells users to match the package and full Action SHA, but the visible example can make a new customer choose an older release.
+The [GitHub Actions guide](GITHUB_ACTIONS.md) now pins `uiwitness@0.26.13` and full release SHA `64c6f6dd0f541a5f79c1ec165080ed9e5a8a316b`. Keep that package/SHA pair together when updating customer instructions. The previously reported stale-example gap is resolved.
 
-Recommended correction before a broad promotional launch: update the example package version and SemVer comments to `0.26.13`, and insert the exact full release commit SHA where a truly copy-ready example is desired.
+### 5.6 Community setup is complete; participation remains unproven
 
-### 5.6 Repository community scaffolding is incomplete
+The repository now has dedicated bug-report, customer-pilot, and feature-evidence issue forms, a [Code of Conduct](../../CODE_OF_CONDUCT.md), and a [support guide](../../SUPPORT.md). GitHub Issues is the canonical public support and feedback queue. Discussions remains intentionally disabled, and suspected vulnerabilities use private reporting.
 
-GitHub reports an 85% community profile. The repository has a README, MIT license, contributing guide, security policy, and pull-request template, but no Code of Conduct and no issue templates. GitHub Discussions is disabled and there is no project homepage.
-
-These are not blockers for the first pilot. They become material before inviting broad community contribution because customers need a predictable place and format for support, bugs, and feature requests.
+The [launch posts](LAUNCH_POSTS.md) include the required authorization and evidence-privacy language. The [asset review](../assets/README.md) records the fictional-data inspection and image digests. These completed items support a pilot; they do not establish customer demand or repeat use.
 
 ### 5.7 Deliberate product limits
 
@@ -565,9 +566,9 @@ The public version is `0.26.13`, so customers should expect a pre-1.0 product. T
 | Deep product workflow | Ready | Configured scan, report, contract, auth, privacy, and CI exist |
 | Release operations | Ready | Protected OIDC publishing and registry consumers are proven |
 | Security/privacy model | Ready within documented trust boundary | Local-first, no telemetry/upload, strict evidence handling |
-| Documentation | Strong, with cleanup | Broad coverage exists; Action example version needs refresh |
+| Documentation | Ready for pilot | Customer guides and Action examples pin the proven public release |
 | Demo assets | Ready | Real 60-cell report images are checked in |
-| Community operations | Partially ready | Contribution/security docs exist; issue templates and Code of Conduct do not |
+| Community operations | Ready for pilot | Issue forms, Code of Conduct, and one Issues-only support path are implemented |
 | External usability evidence | Not ready | No completed unassisted pilot yet |
 | Market demand | Not proven | No stars/forks/watchers and no documented repeat customer use |
 | Enterprise claim | Not ready | No commercial support, hosted collaboration, or adoption proof |
@@ -669,16 +670,18 @@ Hosted collaboration, accounts, billing, automatic AI analysis, and cloud storag
 
 ## 8. Launch plan for the CEO and project manager
 
-### 8.1 Pre-launch cleanup
+### 8.1 Completed pre-launch cleanup
 
-1. Keep `v0.26.13` as the customer installation target until a new protected release is intentionally published.
-2. Refresh GitHub Action examples from `0.26.8` to the current release and use the matching full release SHA.
-3. Add issue templates for bug reports, customer pilot feedback, and feature evidence.
-4. Add a Code of Conduct before inviting broad contribution.
-5. Decide whether to enable GitHub Discussions or keep support entirely in Issues; document one canonical path.
-6. Review the README above the fold on a signed-out browser and mobile viewport.
-7. Confirm the report screenshots contain only fictional Northline data.
-8. Ensure every launch post states the authorization and evidence-privacy boundary.
+The `0.26.16` cleanup is merged. Keep these controls in place:
+
+1. Customer installation and Action examples use proven release `v0.26.13` and its matching full SHA until a new protected release is published.
+2. Dedicated issue forms cover bugs, pilot feedback, and feature evidence.
+3. The Code of Conduct and support guide define public Issues-only routing and private conduct/security reporting.
+4. The README's signed-out desktop and mobile review is recorded in the [launch strategy](LAUNCH_STRATEGY.md).
+5. Report screenshot provenance and reviewed digests are recorded in the [asset review](../assets/README.md).
+6. Every checked-in launch post includes the testing-authorization and evidence-privacy boundary, enforced by repository tests.
+
+The next launch action is the unassisted pilot in Issue #72. Refresh these reviews when their inputs change; do not reopen completed cleanup as a new feature roadmap.
 
 ### 8.2 Pilot launch package
 
@@ -1183,7 +1186,7 @@ Weekly until Gate 2 completes:
 | Screenshots contain sensitive data | Medium | High | Local default, ignore rules, masks, retention, explicit upload, private test data |
 | Users treat exit `1` as a tool crash | Medium | Medium | Repeat “completed finding” language in terminal, docs, and demos |
 | Users treat example failures as repository failure | Medium | Medium | Announce exact 56/4 expected result before the command |
-| Action/package version mismatch | Medium | High | Pin both exact versions; update the stale visible guide example |
+| Action/package version mismatch | Medium | High | Keep the package and full Action SHA pinned to the same proven release |
 | Auth module leaks secrets | Low to medium | High | Trusted-code warning, reviewed commit, protected environment, non-mutating account |
 | Sharded partial evidence is mistaken for a verdict | Low | High | Only merge publishes final truth; retain fail-closed CLI semantics |
 | Pre-1.0 API change surprises early adopters | Medium | Medium | Maintain versioned contracts, changelog, migration guides, and explicit release notes |
@@ -1221,4 +1224,4 @@ This report summarizes, but does not replace, the project’s normative document
 - [Migration guide](MIGRATING_TO_UIWITNESS.md)
 - [Complete changelog](../../CHANGELOG.md)
 
-Current public-state claims in this report were checked against the GitHub repository, latest release and workflow, npm registry metadata, and the open Gate 1 pilot issue on September 7, 2026. Counts and adoption signals will change; product behavior and security claims should continue to be resolved from the versioned source documents and shipped code.
+The original adoption and download snapshot was captured on September 7, 2026. Repository status, the open Gate 1 pilot, the current public release, and the completed cleanup were rechecked on September 10. Historical counts and download windows above retain their original dates. Counts and adoption signals will change; product behavior and security claims should continue to be resolved from the versioned source documents and shipped code.

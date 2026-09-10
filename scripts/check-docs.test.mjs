@@ -62,6 +62,7 @@ test("ignores generated and dependency directories", async (t) => {
   t.after(() => rm(root, { recursive: true, force: true }));
   await write(root, "README.md", "# Fixture\n");
   await write(root, "node_modules/package/BROKEN.md", "broken");
+  await write(root, ".gstack/qa-reports/BROKEN.md", "broken");
   await write(root, ".statecraft/BROKEN.md", "broken");
   await write(root, ".uiwitness/BROKEN.md", "broken");
 

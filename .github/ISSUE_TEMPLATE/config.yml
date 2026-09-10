@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support guide
+    url: https://github.com/RujitRaval/uiwitness/blob/main/SUPPORT.md
+    about: Choose the right public issue form and review the evidence-privacy boundary.
+  - name: Report a security vulnerability privately
+    url: https://github.com/RujitRaval/uiwitness/security/advisories/new
+    about: Do not put vulnerabilities, leaked credentials, or sensitive report contents in a public issue.

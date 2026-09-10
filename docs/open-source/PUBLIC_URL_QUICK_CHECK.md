@@ -7,7 +7,7 @@ UIWitness can turn an authorized live website into local visual evidence before 
 UIWitness supports Node.js 22.20 or newer within Node 22, or Node.js 24.x. In your project:
 
 ```bash
-npm install --save-dev uiwitness playwright@1.62.1
+npm install --save-dev --save-exact uiwitness@0.26.13 playwright@1.62.1
 npx playwright install chromium
 npx uiwitness check https://example.com
 ```
@@ -64,7 +64,7 @@ It requires eight passing cells at each stage, non-empty screenshots, schema-v1 
 Maintainers can repeat the post-publication proof with:
 
 ```bash
-corepack pnpm release:registry-public-url-smoke -- --version 0.24.11
+corepack pnpm release:registry-public-url-smoke -- --version 0.26.13
 ```
 
 Use the npm version that was just published. Registry visibility retries share one bounded ten-minute elapsed-time window. Every attempt forces online revalidation through a distinct temporary npm cache; all consumer files, caches, and evidence are removed after success or failure.

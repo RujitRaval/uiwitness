@@ -6,19 +6,21 @@
 
 **Find the UI states your product forgot.**
 
+![UIWitness report opening with the Evidence over instinct verdict and 93.33 percent coverage for 60 UI executions](docs/assets/uiwitness-report-overview.png)
+
+The image above is the real 60-cell Northline example report. Four deliberately broken coordinates remain visible so the release gate proves UIWitness catches narrow-viewport overflow and theme-specific contrast failures.
+
 UIWitness is a local-first product-state coverage tool. It renders your routes across meaningful states, viewports, and themes; runs assertions; captures screenshots and sanitized diagnostics; and produces one self-contained offline report.
 
+> Test only software you own or are authorized to assess. Evidence stays local by default; review screenshots, URLs, and diagnostics before sharing it.
+
 ```bash
-npm install --save-dev uiwitness playwright@1.62.1
+npm install --save-dev --save-exact uiwitness@0.26.13 playwright@1.62.1
 npx playwright install chromium
 npx uiwitness check https://example.com
 npx uiwitness check https://example.com --write-config
 npx uiwitness scan
 ```
-
-![UIWitness report opening with the Evidence over instinct verdict and 93.33 percent coverage for 60 UI executions](docs/assets/uiwitness-report-overview.png)
-
-The screenshot above is the real 60-cell Northline example report. Four deliberately broken coordinates remain visible so the release gate proves UIWitness catches narrow-viewport overflow and theme-specific contrast failures.
 
 ## Product states, not just pixel changes
 
@@ -54,7 +56,7 @@ UIWitness supports Node.js 22.20 or newer within the Node 22 LTS line, or Node.j
 1. Install the CLI and its pinned browser runtime:
 
    ```bash
-   npm install --save-dev uiwitness playwright@1.62.1
+   npm install --save-dev --save-exact uiwitness@0.26.13 playwright@1.62.1
    npx playwright install chromium
    ```
 
@@ -216,7 +218,7 @@ corepack pnpm build
 
 The Northline scan intentionally exits `1` with exactly 56 passes and four failures. To regenerate the checked-in launch images after producing that report, run `corepack pnpm launch:assets`.
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md). The [Quick Check guide](docs/open-source/PUBLIC_URL_QUICK_CHECK.md), [documentation map](codex/MASTER_PROMPT.md), [implementation specification](codex/IMPLEMENTATION_SPEC.md), [release guide](docs/open-source/RELEASING.md), and [launch strategy](docs/open-source/LAUNCH_STRATEGY.md) explain the product boundary and workflow.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md), and the canonical [support path](SUPPORT.md). The [Quick Check guide](docs/open-source/PUBLIC_URL_QUICK_CHECK.md), [documentation map](codex/MASTER_PROMPT.md), [implementation specification](codex/IMPLEMENTATION_SPEC.md), [release guide](docs/open-source/RELEASING.md), and [launch strategy](docs/open-source/LAUNCH_STRATEGY.md) explain the product boundary and workflow.
 
 Product leaders, design partners, and new customers can use the [CEO report and customer launch playbook](docs/open-source/CEO_CUSTOMER_REPORT.md) for the complete product status, delivery history, launch-readiness assessment, customer onboarding journey, repository guide, risks, metrics, and recommended next gates.
 

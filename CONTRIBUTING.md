@@ -2,6 +2,8 @@
 
 UIWitness has completed Phase 1 through Phase 7. Read `AGENTS.md`, `codex/IMPLEMENTATION_SPEC.md`, and the relevant documents under `docs/` before changing code. Keep proposals within an approved roadmap slice and preserve the local-first product boundary.
 
+Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md). Product questions, bug reports, pilot feedback, and evidence-backed feature requests use the issue forms described in [SUPPORT.md](SUPPORT.md); GitHub Discussions is intentionally not a second support queue.
+
 ## Where to contribute
 
 Good contribution surfaces include deterministic scenarios, additional fictional examples, report usability, documentation, and narrowly scoped adapters or policies that have an approved issue. Bug reports should include the command, exit code, sanitized terminal output, and the smallest safe reproduction. Never attach a `.uiwitness/` bundle or legacy `.statecraft/` evidence until you have checked every screenshot, URL, and diagnostic for sensitive data.

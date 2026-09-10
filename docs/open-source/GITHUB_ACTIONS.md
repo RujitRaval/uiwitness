@@ -7,10 +7,10 @@ UIWitness ships a thin composite Action that runs the `uiwitness` version alread
 Install the exact UIWitness release and its documented Playwright version as development dependencies, commit the lockfile, and make sure your application can be built and served in CI.
 
 ```bash
-npm install --save-dev --save-exact uiwitness@0.26.8 playwright@1.62.1
+npm install --save-dev --save-exact uiwitness@0.26.13 playwright@1.62.1
 ```
 
-Pin the Action to the full 40-character commit SHA for the same release. Replace `<full-release-commit-sha>` below with the SHA shown on that GitHub Release. The SemVer comment is for humans; the SHA is the cryptographically stable reference.
+Pin the Action to the full 40-character commit SHA for the same release. The current customer target is `v0.26.13`, whose release commit is `64c6f6dd0f541a5f79c1ec165080ed9e5a8a316b`. The SemVer comment is for humans; the SHA is the cryptographically stable reference.
 
 ```yaml
 name: UIWitness
@@ -56,12 +56,12 @@ jobs:
           exit 1
       - name: Guard promised product states
         id: uiwitness
-        uses: RujitRaval/uiwitness@<full-release-commit-sha> # v0.26.8
+        uses: RujitRaval/uiwitness@64c6f6dd0f541a5f79c1ec165080ed9e5a8a316b # v0.26.13
 ```
 
 The Action reads its own checked-in `VERSION`, runs the project-local `uiwitness --version`, and stops before browser work if the versions differ. Each guard invocation writes and validates a new exclusive internal `--json` verdict copy, so stale evidence already in the workspace cannot satisfy the current job. The repair for version drift is exact: update the package and Action pin to the same release, reinstall, and commit the lockfile. UIWitness does not fall back to `npx`, a global binary, or an implicit package download.
 
-Full SemVer tags such as `v0.26.8` are protected by repository tag rules and are a readable convenience, but GitHub can technically move a tag. Mutable major tags are not published. Use the full release SHA for the strongest supply-chain boundary. The release workflow proves the exact four packed packages and matching Action SHA on Node 22 and 24 with both a pass and seeded regression before publication. It then verifies npm provenance and both registry consumers. To roll back, pin both the dependency and Action to the prior known-good release and rerun the same consumer proof.
+Full SemVer tags such as `v0.26.13` are protected by repository tag rules and are a readable convenience, but GitHub can technically move a tag. Mutable major tags are not published. Use the full release SHA for the strongest supply-chain boundary. The release workflow proves the exact four packed packages and matching Action SHA on Node 22 and 24 with both a pass and seeded regression before publication. It then verifies npm provenance and both registry consumers. To roll back, pin both the dependency and Action to the prior known-good release and rerun the same consumer proof.
 
 ## Inputs
 
@@ -80,7 +80,7 @@ Values move from Action expressions into environment variables and then into a s
 ```yaml
       - name: Guard a non-default contract
         id: uiwitness
-        uses: RujitRaval/uiwitness@<full-release-commit-sha> # v0.26.8
+        uses: RujitRaval/uiwitness@64c6f6dd0f541a5f79c1ec165080ed9e5a8a316b # v0.26.13
         with:
           config: config/uiwitness.config.mts
           contract: contracts/product-states.json
@@ -113,7 +113,7 @@ Evidence upload is off by default. Enable it only when the repository and captur
 
 ```yaml
       - name: Guard and retain evidence for one day
-        uses: RujitRaval/uiwitness@<full-release-commit-sha> # v0.26.8
+        uses: RujitRaval/uiwitness@64c6f6dd0f541a5f79c1ec165080ed9e5a8a316b # v0.26.13
         with:
           upload-artifact: true
           retention-days: 1

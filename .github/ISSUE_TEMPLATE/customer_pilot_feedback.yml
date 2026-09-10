@@ -1,0 +1,77 @@
+name: Customer pilot feedback
+description: Share structured, privacy-safe evidence from a UIWitness evaluation.
+title: "pilot: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share the learning, not private application evidence. Use fictional or sanitized descriptions and keep customer names, private URLs, credentials, screenshots, and raw diagnostics out of this public issue.
+  - type: input
+    id: version
+    attributes:
+      label: UIWitness version
+      placeholder: 0.26.13
+    validations:
+      required: true
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Workflow evaluated
+      options:
+        - Public URL Quick Check
+        - Configured scan
+        - State Contract Guard
+        - GitHub Action
+        - Multiple workflows
+    validations:
+      required: true
+  - type: input
+    id: context
+    attributes:
+      label: Sanitized product context
+      description: Describe the application category and team shape without identifying the customer.
+      placeholder: Five-person team evaluating a private B2B dashboard
+    validations:
+      required: true
+  - type: textarea
+    id: job
+    attributes:
+      label: Job you were trying to complete
+      description: What prompted the pilot, and what outcome did you need?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What happened
+      description: Describe useful findings, friction, time to first evidence, and where the workflow stopped.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence summary
+      description: Summarize counts, state categories, or failure types without pasting report contents.
+      placeholder: The scan covered 24 coordinates and exposed two mobile overflow failures.
+    validations:
+      required: true
+  - type: textarea
+    id: next_step
+    attributes:
+      label: Most valuable next improvement
+      description: Name the smallest change that would make another pilot materially better.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Authorization and privacy check
+      options:
+        - label: The pilot covered only software the participant owned or was authorized to test.
+          required: true
+        - label: I removed customer-identifying data, credentials, private URLs, screenshots, and raw diagnostics from this issue.
+          required: true
+        - label: I understand that a public GitHub issue is public evidence.
+          required: true

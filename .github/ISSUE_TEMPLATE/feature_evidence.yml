@@ -1,0 +1,63 @@
+name: Feature evidence
+description: Propose a focused capability backed by an observed user need.
+title: "evidence: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        UIWitness expands from evidence, not speculation. Describe the observed job and smallest useful outcome without publishing private application evidence.
+  - type: textarea
+    id: observed_problem
+    attributes:
+      label: Observed problem
+      description: What concrete job, missed product state, or repeated failure did you observe?
+    validations:
+      required: true
+  - type: textarea
+    id: affected_users
+    attributes:
+      label: Who is affected and how often
+      description: Describe the user or team shape, frequency, and impact without identifying a customer.
+    validations:
+      required: true
+  - type: textarea
+    id: current_workaround
+    attributes:
+      label: Current workaround
+      description: What do people do today, and why is it insufficient?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized supporting evidence
+      description: Summarize interviews, pilot outcomes, issue links, or non-sensitive reproduction data.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Smallest useful outcome
+      description: State what a narrowly scoped implementation would let the user do.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Scope boundaries
+      description: What should remain explicitly out of scope?
+    validations:
+      required: true
+  - type: checkboxes
+    id: fit
+    attributes:
+      label: Product-boundary check
+      options:
+        - label: This request can preserve local-first, deterministic operation without a required hosted backend, account, telemetry, or LLM.
+          required: true
+        - label: Any testing evidence came only from software the participant owned or was authorized to test.
+          required: true
+        - label: I removed customer data, credentials, private URLs, screenshots, and raw diagnostics from this public issue.
+          required: true

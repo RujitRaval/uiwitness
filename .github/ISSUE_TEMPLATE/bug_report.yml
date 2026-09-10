@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a reproducible UIWitness defect with sanitized evidence.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve UIWitness. Start with a textual reproduction and remove customer data, credentials, private URLs, screenshots, and diagnostics that are not safe to publish.
+  - type: input
+    id: version
+    attributes:
+      label: UIWitness version
+      description: Paste the exact package version or commit SHA.
+      placeholder: 0.26.13
+    validations:
+      required: true
+  - type: dropdown
+    id: command
+    attributes:
+      label: Affected workflow
+      options:
+        - check
+        - init
+        - scan
+        - open
+        - guard
+        - contract
+        - GitHub Action
+        - package API
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the operating system, Node.js version, package manager, and browser runtime version.
+      placeholder: macOS 15; Node 22.20.0; npm 11; Playwright 1.62.1
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal sanitized reproduction
+      description: List the smallest safe sequence that reproduces the problem. Include the command and exit code.
+      placeholder: |
+        1. Run ...
+        2. Observe exit code ...
+        3. Open ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Paste only sanitized terminal text. Do not attach an evidence bundle by default.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Authorization and privacy check
+      options:
+        - label: I reproduced this only against software I own or am authorized to test.
+          required: true
+        - label: I reviewed this issue and its attachments for credentials, customer data, private URLs, screenshots, and diagnostics.
+          required: true
+        - label: This is not a security vulnerability or sensitive-data exposure report.
+          required: true
