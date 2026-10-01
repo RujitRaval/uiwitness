@@ -53,7 +53,7 @@
   "dependencies": {
     "uiwitness-core": "workspace:*",
     "uiwitness-report": "workspace:*",
-    "playwright": "1.62.1"
+    "playwright": "1.63.0"
   },
   "devDependencies": {
     "@types/node": "22.20.1",
