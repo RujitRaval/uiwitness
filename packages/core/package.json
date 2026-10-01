@@ -54,7 +54,7 @@
   "dependencies": {
     "canonicalize": "4.0.0",
     "jsonc-parser": "3.3.1",
-    "tldts": "7.4.11",
+    "tldts": "7.4.16",
     "zod": "4.5.3"
   }
 }
