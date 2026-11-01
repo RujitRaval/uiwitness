@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
       - name: Set up release-verification runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.19.0
           package-manager-cache: false
@@ -55,7 +55,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/uiwitness-release-bundle"
           node scripts/release-package-smoke.mjs --output "$RUNNER_TEMP/uiwitness-release-bundle/packages" --action-sha "$GITHUB_SHA"
       - name: Set up Node 22 release consumer
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22.20.0
           package-manager-cache: false
@@ -100,7 +100,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
       - name: Set up trusted-publishing runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.19.0
           package-manager-cache: false
@@ -157,7 +157,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - name: Set up the registry-consumer runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.19.0
           package-manager-cache: false
@@ -191,7 +191,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - name: Set up the registry-consumer runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           package-manager-cache: false
